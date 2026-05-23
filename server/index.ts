@@ -29,9 +29,8 @@ const watcher = new SessionWatcher({
   },
 });
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = req.url ?? "";
-  // CORS for vite dev server on a different origin (in practice we proxy, but be safe).
   res.setHeader("Access-Control-Allow-Origin", "*");
 
   if (req.method === "GET" && url === "/api/state") {
@@ -47,11 +46,26 @@ const server = http.createServer((req, res) => {
       Connection: "keep-alive",
     });
     sseClients.add(res);
-    // Initial snapshot so a freshly-connected client sees current state.
     res.write(
       `data: ${JSON.stringify({ type: "snapshot", agents: watcher.list() } satisfies ServerEvent)}\n\n`
     );
     req.on("close", () => sseClients.delete(res));
+    return;
+  }
+
+  if (req.method === "POST" && url === "/api/hook") {
+    let body = "";
+    try {
+      for await (const chunk of req) body += chunk;
+      const payload = body ? (JSON.parse(body) as Record<string, unknown>) : {};
+      watcher.applyHookEvent(payload);
+      res.writeHead(204);
+      res.end();
+    } catch (err) {
+      console.warn("[server] /api/hook bad payload:", err);
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("Bad JSON");
+    }
     return;
   }
 

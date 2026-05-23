@@ -44,6 +44,57 @@ export class SessionWatcher {
     return Date.now() - agent.lastActivityAt < ACTIVE_WINDOW_MS;
   }
 
+  /**
+   * Apply a Claude Code hook event POSTed by the user's shell hooks. We mostly
+   * rely on JSONL watching, but two events give us info the file alone can't
+   * provide quickly:
+   *   - Notification: Claude is waiting for the human (permission, idle prompt).
+   *   - SessionEnd: explicit signal the session is over.
+   */
+  applyHookEvent(payload: Record<string, unknown>): void {
+    const sessionId = String(payload.session_id ?? "");
+    const event = String(payload.hook_event_name ?? "");
+    if (!sessionId || !event) return;
+
+    let tracker: SessionTracker | undefined;
+    for (const t of this.trackers.values()) {
+      if (t.agent.sessionId === sessionId) {
+        tracker = t;
+        break;
+      }
+    }
+    if (!tracker) return;
+
+    const now = Date.now();
+    let changed = false;
+
+    switch (event) {
+      case "Notification": {
+        tracker.agent.status = "awaiting_approval";
+        tracker.agent.lastActivityAt = now;
+        const msg = typeof payload.message === "string" ? payload.message.trim() : "";
+        if (msg) tracker.agent.currentToolDetail = msg;
+        changed = true;
+        break;
+      }
+      case "SessionEnd": {
+        tracker.agent.status = "done";
+        tracker.agent.turnEnded = true;
+        tracker.agent.currentTool = undefined;
+        tracker.agent.currentToolDetail = undefined;
+        tracker.agent.lastActivityAt = now;
+        changed = true;
+        break;
+      }
+      default:
+        return;
+    }
+
+    if (changed && this.isActive(tracker.agent)) {
+      this.events.onUpdate(tracker.agent);
+    }
+  }
+
   async start(): Promise<void> {
     // chokidar v4+ removed glob support — watch the directory recursively
     // and filter by extension in the handlers.

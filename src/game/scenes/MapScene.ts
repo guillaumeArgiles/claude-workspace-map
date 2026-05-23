@@ -177,6 +177,10 @@ interface NpcInstance {
   statusBadge?: Phaser.GameObjects.Graphics;
   /** Live activity bubble shown briefly when the agent starts a new tool. */
   activityBubble?: Phaser.GameObjects.Container;
+  /** Floating ? / ! glyph for awaiting_approval or blocked statuses. */
+  statusGlyph?: Phaser.GameObjects.Container;
+  /** When set, the sub-agent should be despawned at this time (post-done linger). */
+  despawnAt?: number;
 }
 
 type Direction = "down" | "left" | "right" | "up";
@@ -560,7 +564,10 @@ export class MapScene extends Phaser.Scene {
     for (const sub of agent.subAgents) {
       if (sub.finished) continue;
       const studentNpc = this.spawnStudent(agent, sub, npc);
-      if (studentNpc) studentMap.set(sub.id, studentNpc);
+      if (studentNpc) {
+        studentMap.set(sub.id, studentNpc);
+        this.fadeInNpc(studentNpc);
+      }
     }
   }
 
@@ -593,6 +600,8 @@ export class MapScene extends Phaser.Scene {
       incoming.add(sub.id);
       const existing = studentMap.get(sub.id);
       if (existing) {
+        // Re-activated: cancel any pending despawn from a previous "done" linger.
+        existing.despawnAt = undefined;
         const subPrevTool = existing.def.currentTool;
         const subPrevDetail = existing.def.currentToolDetail;
         existing.def.status = sub.status;
@@ -606,14 +615,21 @@ export class MapScene extends Phaser.Scene {
         }
       } else {
         const studentNpc = this.spawnStudent(agent, sub, npc);
-        if (studentNpc) studentMap.set(sub.id, studentNpc);
+        if (studentNpc) {
+          studentMap.set(sub.id, studentNpc);
+          this.fadeInNpc(studentNpc);
+        }
       }
     }
-    for (const [subId, studentNpc] of studentMap) {
-      if (!incoming.has(subId)) {
-        this.destroyNpc(studentNpc);
-        studentMap.delete(subId);
-      }
+    // Sub-agents missing from the latest snapshot have finished. Linger 2.5s
+    // showing `done` so the user can see they completed, then fade out.
+    for (const [, studentNpc] of studentMap) {
+      if (incoming.has(studentNpc.def.id)) continue;
+      if (studentNpc.despawnAt) continue;
+      studentNpc.def.status = "done";
+      studentNpc.def.dialogue = "Sub-task complete.";
+      this.refreshStatusBadge(studentNpc);
+      studentNpc.despawnAt = this.time.now + 2500;
     }
   }
 
@@ -686,15 +702,97 @@ export class MapScene extends Phaser.Scene {
   private destroyNpc(npc: NpcInstance): void {
     npc.statusBadge?.destroy();
     npc.activityBubble?.destroy();
+    npc.statusGlyph?.destroy();
     npc.sprite.destroy();
     const idx = this.npcs.indexOf(npc);
     if (idx >= 0) this.npcs.splice(idx, 1);
     if (this.nearestNpc === npc) this.nearestNpc = undefined;
   }
 
+  /** Fade an NPC's sprite + overlays in over a few hundred ms. */
+  private fadeInNpc(npc: NpcInstance): void {
+    const targets: Phaser.GameObjects.GameObject[] = [npc.sprite];
+    if (npc.statusBadge) targets.push(npc.statusBadge);
+    npc.sprite.setAlpha(0);
+    npc.statusBadge?.setAlpha(0);
+    this.tweens.add({
+      targets,
+      alpha: 1,
+      duration: 350,
+      ease: Phaser.Math.Easing.Quadratic.Out,
+    });
+  }
+
+  /** Fade out + destroy, used at the end of a sub-agent's lifecycle. */
+  private fadeOutAndDestroy(npc: NpcInstance): void {
+    const targets: Phaser.GameObjects.GameObject[] = [npc.sprite];
+    if (npc.statusBadge) targets.push(npc.statusBadge);
+    if (npc.statusGlyph) targets.push(npc.statusGlyph);
+    if (npc.activityBubble) targets.push(npc.activityBubble);
+    this.tweens.add({
+      targets,
+      alpha: 0,
+      duration: 400,
+      ease: Phaser.Math.Easing.Quadratic.In,
+      onComplete: () => this.destroyNpc(npc),
+    });
+  }
+
+  private tickSubAgentDespawns(now: number): void {
+    for (const map of this.studentNpcs.values()) {
+      for (const [id, npc] of Array.from(map.entries())) {
+        if (npc.despawnAt && now >= npc.despawnAt) {
+          map.delete(id);
+          this.fadeOutAndDestroy(npc);
+        }
+      }
+    }
+  }
+
   private refreshStatusBadge(npc: NpcInstance): void {
     npc.statusBadge?.destroy();
     npc.statusBadge = this.makeStatusBadge(npc.def.status ?? "idle");
+    this.refreshStatusGlyph(npc);
+  }
+
+  /** ? glyph for awaiting_approval, ! for blocked, nothing otherwise. */
+  private refreshStatusGlyph(npc: NpcInstance): void {
+    const status = npc.def.status;
+    const want = status === "awaiting_approval" || status === "blocked";
+    if (!want) {
+      npc.statusGlyph?.destroy();
+      npc.statusGlyph = undefined;
+      return;
+    }
+    if (npc.statusGlyph) return; // already set; updateStatusGlyph re-positions it each frame
+    const isBlocked = status === "blocked";
+    const text = isBlocked ? "!" : "?";
+    const color = isBlocked ? "#ef4444" : "#eab308";
+    const t = this.add
+      .text(0, 0, text, {
+        fontSize: "20px",
+        fontStyle: "bold",
+        color,
+        stroke: "#000000",
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 0.5);
+    const container = this.add.container(0, 0, [t]);
+    container.setSize(t.width, t.height);
+    container.setDepth(layerDepth.OVERLAYS + 2);
+    npc.statusGlyph = container;
+  }
+
+  private updateStatusGlyph(npc: NpcInstance): void {
+    if (!npc.statusGlyph) return;
+    const sprite = npc.sprite;
+    // Gentle bob synced to global time so glyphs all bob in sync (cheap, no tween).
+    const bob = Math.sin(this.time.now / 280) * 3;
+    npc.statusGlyph.setPosition(
+      sprite.x,
+      sprite.y - sprite.displayHeight * 0.5 - 22 + bob
+    );
+    npc.statusGlyph.setDepth(sprite.depth + 3);
   }
 
   /**
@@ -852,14 +950,19 @@ export class MapScene extends Phaser.Scene {
       this.charNeedsRightFlip.has("player") && this.playerLastDir === "right"
     );
 
-    // NPC AI + y-sort + status badge follow + activity bubble follow
+    // NPC AI + y-sort + overlays follow
     const now = this.time.now;
     for (const npc of this.npcs) {
       this.updateNpc(npc, now);
       npc.sprite.setDepth(layerDepth.AGENTS + Math.round(npc.sprite.y));
       this.updateStatusBadge(npc);
+      this.updateStatusGlyph(npc);
       this.positionActivityBubble(npc);
     }
+
+    // Sub-agent despawn timer: a finished student lingers a short while in
+    // `done` so the user can see they completed, then fades out.
+    this.tickSubAgentDespawns(now);
 
     // Interaction prompt
     this.updateNearestNpc();
@@ -929,6 +1032,21 @@ export class MapScene extends Phaser.Scene {
     };
 
     if (this.dialogueOpenFor === npc) {
+      npc.sprite.setVelocity(0, 0);
+      playIdle();
+      return;
+    }
+
+    // Pinned statuses: the agent stands still. The colour badge + the floating
+    // glyph still tell the user what's going on; movement would be a distraction
+    // when the agent is actually waiting / stuck / done.
+    const status = npc.def.status ?? "idle";
+    if (
+      status === "blocked" ||
+      status === "awaiting_approval" ||
+      status === "done" ||
+      status === "idle"
+    ) {
       npc.sprite.setVelocity(0, 0);
       playIdle();
       return;
