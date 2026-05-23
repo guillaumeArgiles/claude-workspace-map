@@ -1,0 +1,102 @@
+{
+  "version": "1.2",
+  "description": "8 main agents (teachers) répartis dans les 3 bâtiments. Chaque agent peut avoir des sous-agents (students) — voir public/assets/sprites/su1_student_*.png pour les sprites disponibles. Édite x/y/sprite/dialogue ici, Vite recharge.",
+  "npcs": [
+    {
+      "id": "claude_dev_sam",
+      "name": "Sam",
+      "building": "CLAUDE",
+      "role": "teacher",
+      "x": 260,
+      "y": 220,
+      "sprite": "teacher_male_01",
+      "bodyColor": "#1e40af",
+      "headColor": "#fcd9b6",
+      "dialogue": "Je shippe la feature auth aujourd'hui. PR presque prête pour review."
+    },
+    {
+      "id": "claude_dev_alex",
+      "name": "Alex",
+      "building": "CLAUDE",
+      "role": "teacher",
+      "x": 430,
+      "y": 280,
+      "sprite": "teacher_male_02",
+      "bodyColor": "#f97316",
+      "headColor": "#fcd9b6",
+      "dialogue": "Refactor fini. Tests verts. Je passe au ticket suivant."
+    },
+    {
+      "id": "claude_dev_lee",
+      "name": "Lee",
+      "building": "CLAUDE",
+      "role": "teacher",
+      "x": 200,
+      "y": 340,
+      "sprite": "teacher_male_03",
+      "bodyColor": "#6366f1",
+      "headColor": "#fde68a",
+      "dialogue": "Petite pause café, mon cerveau a besoin d'un reboot."
+    },
+    {
+      "id": "review_riley",
+      "name": "Riley",
+      "building": "REVIEW",
+      "role": "teacher",
+      "x": 570,
+      "y": 250,
+      "sprite": "teacher_female_01",
+      "bodyColor": "#16a34a",
+      "headColor": "#fcd9b6",
+      "dialogue": "Je regarde la PR auth. Tests solides, je vérifie juste les edge cases."
+    },
+    {
+      "id": "review_jordan",
+      "name": "Jordan",
+      "building": "REVIEW",
+      "role": "teacher",
+      "x": 850,
+      "y": 250,
+      "sprite": "teacher_male_04",
+      "bodyColor": "#ca8a04",
+      "headColor": "#92400e",
+      "dialogue": "3 PR mergées ce matin. Le backlog fond enfin."
+    },
+    {
+      "id": "review_casey",
+      "name": "Casey",
+      "building": "REVIEW",
+      "role": "teacher",
+      "x": 720,
+      "y": 340,
+      "sprite": "teacher_female_02",
+      "bodyColor": "#0d9488",
+      "headColor": "#fcd9b6",
+      "dialogue": "Standup dans 5. On doit reparler du timeline de la migration."
+    },
+    {
+      "id": "monitoring_morgan",
+      "name": "Morgan",
+      "building": "MONITORING",
+      "role": "teacher",
+      "x": 1130,
+      "y": 280,
+      "sprite": "teacher_female_03",
+      "bodyColor": "#a855f7",
+      "headColor": "#fcd9b6",
+      "dialogue": "Tous les dashboards au vert. Latence p99 stable à 80ms."
+    },
+    {
+      "id": "monitoring_sky",
+      "name": "Sky",
+      "building": "MONITORING",
+      "role": "teacher",
+      "x": 1230,
+      "y": 280,
+      "sprite": "teacher_female_04",
+      "bodyColor": "#dc2626",
+      "headColor": "#fcd9b6",
+      "dialogue": "Je surveille le déploiement. Ramp à 100% prévu dans 20 min."
+    }
+  ]
+}
