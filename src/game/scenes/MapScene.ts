@@ -22,6 +22,8 @@ interface NpcDef {
   id: string;
   name: string;
   building?: string;
+  /** Free-form role label shown in the dialogue bubble (e.g. "Teacher", "Student"). */
+  role?: string;
   x: number;
   y: number;
   bodyColor: string;
@@ -137,6 +139,11 @@ export class MapScene extends Phaser.Scene {
 
   /** Final on-screen height (px) for any character with a real sprite. */
   private static readonly TARGET_CHAR_HEIGHT = 64;
+  /** Hitbox = fraction of the sprite. Centred horizontally, anchored at feet. */
+  private static readonly HITBOX_W_RATIO = 0.7;
+  private static readonly HITBOX_H_RATIO = 0.5;
+  /** Camera zoom level — 1.0 shows the whole map, >1 zooms in on the player. */
+  private static readonly CAMERA_ZOOM = 1.2;
   /**
    * Native texture height (px) after downsample. Smaller than the displayed
    * size on purpose: when Phaser scales it back up with nearest-neighbour,
@@ -169,11 +176,19 @@ export class MapScene extends Phaser.Scene {
     const pbody = this.player.body as Phaser.Physics.Arcade.Body;
     const pw = this.player.width;
     const ph = this.player.height;
-    pbody.setSize(pw * 0.5, ph * 0.3);
-    pbody.setOffset(pw * 0.25, ph * 0.7);
+    pbody.setSize(pw * MapScene.HITBOX_W_RATIO, ph * MapScene.HITBOX_H_RATIO);
+    pbody.setOffset(
+      pw * (1 - MapScene.HITBOX_W_RATIO) / 2,
+      ph * (1 - MapScene.HITBOX_H_RATIO)
+    );
     this.player.play("player_idle_down");
 
     this.physics.add.collider(this.player, this.obstacles);
+
+    // Camera: smooth follow + slight zoom, clamped to the map.
+    this.cameras.main.setBounds(0, 0, GRID.width, GRID.height);
+    this.cameras.main.setZoom(MapScene.CAMERA_ZOOM);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
     // NPCs
     const npcsFile = this.cache.json.get("npcs") as NpcsFile;
@@ -267,8 +282,11 @@ export class MapScene extends Phaser.Scene {
     this.scaleCharacterIfReal(sprite, spriteKey);
     const body = sprite.body as Phaser.Physics.Arcade.Body;
     body.pushable = false;
-    body.setSize(sprite.width * 0.5, sprite.height * 0.3);
-    body.setOffset(sprite.width * 0.25, sprite.height * 0.7);
+    body.setSize(sprite.width * MapScene.HITBOX_W_RATIO, sprite.height * MapScene.HITBOX_H_RATIO);
+    body.setOffset(
+      sprite.width * (1 - MapScene.HITBOX_W_RATIO) / 2,
+      sprite.height * (1 - MapScene.HITBOX_H_RATIO)
+    );
     sprite.setDepth(layerDepth.AGENTS + Math.round(def.y));
     sprite.play(`${def.id}_idle_down`);
 
@@ -411,7 +429,9 @@ export class MapScene extends Phaser.Scene {
 
     const padding = 10;
     const maxWidth = 320;
-    const nameText = this.add.text(0, 0, npc.def.name, {
+    const role = this.formatRole(npc.def.role);
+    const heading = role ? `${npc.def.name}  ·  ${role}` : npc.def.name;
+    const nameText = this.add.text(0, 0, heading, {
       fontSize: "13px",
       fontStyle: "bold",
       color: "#1a202c",
@@ -456,6 +476,12 @@ export class MapScene extends Phaser.Scene {
     this.dialogueGroup?.destroy();
     this.dialogueGroup = undefined;
     this.dialogueOpenFor = undefined;
+  }
+
+  private formatRole(role?: string): string {
+    if (!role) return "";
+    // Title-case the JSON role ("teacher" → "Teacher").
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
   }
 
   /**
