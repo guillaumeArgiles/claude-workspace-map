@@ -1,0 +1,188 @@
+# Backlog — Claude Workspace Map
+
+Backlog produit pour la roadmap **12 mois → exit Anthropic**.
+
+Référence : [Plan complet](../../..>(plan local, non versionné)) (chez l'utilisateur, pas dans le repo).
+
+Conventions :
+- `S<phase>.<num>` = story du sprint (ex: `S1.1`)
+- `P<phase>.<num>` = chantier transverse de phase
+- Statut : `[ ]` pas commencé · `[~]` en cours · `[x]` livré · `[!]` bloqué
+
+---
+
+## Phase 1 — Foundation Pro (M1-M2)
+
+But : PoC → outil installable, stable, partageable.
+
+### Sprint 1 — Stabilisation (en cours)
+
+- [~] **S1.1** Refactor `MapScene.ts` en 7 modules (~4j)
+- [ ] **S1.2** Reconnect SSE robuste + React ErrorBoundary (~1j)
+- [ ] **S1.3** Logger structuré server-side + cleanup `console.*` (~0.5j)
+- [ ] **S1.4** Vitest setup + tests sur `parser.ts` (~1j)
+- [ ] **S1.5** ADR 0001 — décision PTY/tmux (~0.5j)
+
+### Sprint 2 — Types stricts + tests étendus
+
+- [ ] **S2.1** Zod (ou typebox) pour valider chaque ligne JSONL avant parsing
+- [ ] **S2.2** Tests sur `server/watcher.ts` (add/change/unlink, byte offset, sub-agents)
+- [ ] **S2.3** Strict TS settings (noUnusedLocals, noUnusedParameters, noImplicitReturns)
+- [ ] **S2.4** CI GitHub Actions : tsc + vitest + lint sur PR
+
+### Sprint 3 — Packaging Electron
+
+- [ ] **S3.1** Bootstrap Electron + bundle Node server + Vite build
+- [ ] **S3.2** Auto-update (electron-updater + GitHub releases)
+- [ ] **S3.3** Icons + branding minimal (logo, splash)
+- [ ] **S3.4** Build matrice macOS Apple Silicon / macOS Intel / Linux x64
+
+### Sprint 4 — Onboarding + docs
+
+- [ ] **S4.1** Quick Start README (3 étapes max)
+- [ ] **S4.2** Page Settings in-app : port, projects watchés, génération snippet hooks
+- [ ] **S4.3** Vidéo demo 90s + screenshots
+- [ ] **S4.4** Landing page `claude-workspace.dev` (1 page Astro)
+- [ ] **S4.5** Public GitHub release + Show HN
+
+**Métrique de fin de phase** : 500 stars, 100 installs.
+
+---
+
+## Phase 2 — Talk to Agents (M3-M4)
+
+But : observateur → orchestrateur. "Wow moment" pour les démos.
+
+### Sprint 5 — PTY launcher
+
+- [ ] **S5.1** Intégration `node-pty` côté server
+- [ ] **S5.2** `POST /api/sessions` : lance une session Claude dans un PTY (cwd, mode)
+- [ ] **S5.3** Mapping `pty.pid → session_id` via JSONL nouveau fichier
+- [ ] **S5.4** UI "Spawn Claude here" dans chaque house + "New session" dans sidebar avec sélecteur projet
+
+### Sprint 6 — Talk to existing session
+
+- [ ] **S6.1** Détection sessions tmux-aware + `tmux send-keys` fallback
+- [ ] **S6.2** Chat panel React (slide-in à droite) avec historique + input
+- [ ] **S6.3** Envoi via `pty.write` + streaming retour via JSONL watcher
+- [ ] **S6.4** Politique de gestion sessions externes (avertir user, re-lancer dans PTY, ignorer)
+
+### Sprint 7 — Réponses contextuelles
+
+- [ ] **S7.1** UI dédiée AskUserQuestion : parse questions, boutons radio, submit
+- [ ] **S7.2** Modal ExitPlanMode : afficher plan complet, Approve / Reject / Edit
+- [ ] **S7.3** Popup natif Notification (Electron) avec input réponse rapide
+- [ ] **S7.4** Notarisation macOS Developer ID + Linux AppImage signing
+
+### Sprint 8 — Polish + métriques
+
+- [ ] **S8.1** Telemetry opt-in (PostHog ou self-hosted) — `session_started`, `message_sent`, `plan_approved`, NPS in-app
+- [ ] **S8.2** Raccourcis clavier : 1/2/3 = jump entre houses, Cmd+K chat, drag-n-drop fichiers
+- [ ] **S8.3** Public Beta launch (Product Hunt + Twitter + HN)
+
+**Métrique de fin de phase** : 200 DAU, NPS ≥ 50, 5-10 témoignages filmés.
+
+---
+
+## Phase 3 — Team mode + premiers revenus (M5-M6)
+
+But : démontrer une willingness to pay.
+
+### Sprint 9 — Auth + Cloud sync
+
+- [ ] **S9.1** Backend cloud minimal (Cloudflare Workers + D1 ou Supabase)
+- [ ] **S9.2** Magic link auth (Resend ou Postmark)
+- [ ] **S9.3** Toggle "Sync with team" : push état local, pull autres
+- [ ] **S9.4** RGPD : on ne stocke QUE metadata (cwd, projectName, status, lastActivityAt)
+
+### Sprint 10 — Multi-machine view
+
+- [ ] **S10.1** Sidebar : sections par machine
+- [ ] **S10.2** Avatars distincts pour agents pilotés par d'autres humains
+- [ ] **S10.3** Permissions : read-only sur sessions des autres par défaut
+
+### Sprint 11 — Pricing + paiement
+
+- [ ] **S11.1** Stripe integration (subscriptions $12/user/mois)
+- [ ] **S11.2** Page pricing landing
+- [ ] **S11.3** Trial 14j + paywall sync cloud
+
+### Sprint 12 — Marketing push
+
+- [ ] **S12.1** Outreach LinkedIn/Twitter aux 200 DAU actifs (interviews, témoignages)
+- [ ] **S12.2** Articles invités (Console.dev, Bytes.dev, dev.to)
+- [ ] **S12.3** Conférences locales si timing OK
+- [ ] **S12.4** **Premiers contacts DevRel Anthropic** (Alex Albert) — pitch produit, feedback, pas encore "à vendre"
+
+**Métrique de fin de phase** : 5 équipes payantes (50 user accounts), 500 DAU.
+
+---
+
+## Phase 4 — Pré-deal (M7-M9)
+
+### Sprint 13-14 — Notifications + intégrations
+
+- [ ] **S13.1** Notifs natives macOS/Linux pour `awaiting_approval` + `blocked`, action inline
+- [ ] **S13.2** Slack integration (status pings équipe)
+- [ ] **S13.3** Discord integration
+- [ ] **S14.1** GitHub integration (lier sessions aux PRs)
+
+### Sprint 15-16 — Performance + scale
+
+- [ ] **S15.1** Optim chokidar pour 500+ JSONL files (eviction + index)
+- [ ] **S15.2** Backend cloud : indexes proper, p99 < 100ms
+- [ ] **S16.1** Stress test : 50 sessions simultanées sur 1 machine
+
+### Sprint 17-18 — Présentation publique
+
+- [ ] **S17.1** Public launch V1 (Product Hunt top 5 visé)
+- [ ] **S17.2** Coverage presse (The New Stack, InfoQ, Anthropic blog)
+- [ ] **S18.1** **Premier contact concret Anthropic** — conversation business, LOI/term sheet préliminaire
+
+**Métrique de fin de phase** : 2000 DAU, 30 équipes payantes (~$20k MRR), 1 conversation acquisition en cours.
+
+---
+
+## Phase 5 — Closing (M10-M12)
+
+### Sprint 19-20 — Due diligence ready
+
+- [ ] **S19.1** Audit dépendances (Snyk) + licences (FOSSA)
+- [ ] **S19.2** Documentation technique exhaustive (ADRs, runbooks, schémas)
+- [ ] **S20.1** Audit légal : statuts entreprise, IP transferable, CGU, RGPD
+
+### Sprint 21-22 — Négociation deal
+
+- [ ] **S21.1** Avocat M&A
+- [ ] **S21.2** Pitch deck acquisition (différent du sales deck)
+- [ ] **S22.1** Term sheet négociée (earn-out vs cash up-front)
+- [ ] **S22.2** Approches secondaires si Anthropic traîne (Cursor, MS DevDiv, GitHub)
+
+### Sprint 23-24 — Closing ou pivot
+
+- [ ] **S23.1** Signing si deal OK
+- [ ] **S23.2** Plan transition tech + équipe
+- [ ] **S24.1** Si pas de deal : pivot SaaS, reprendre 12-18 mois avec metrics solides
+
+---
+
+## Chantiers transverses (toutes phases)
+
+- [ ] **PT.1** Mutualiser `STATUS_COLOR`/`STATUS_LABEL` dans `shared/agent-ui.ts` (Sprint 1)
+- [ ] **PT.2** Bus factor : code propre + ADRs + docs continus
+- [ ] **PT.3** Dogfooding : utiliser le widget chaque jour, noter friction
+- [ ] **PT.4** User interviews : 2 calls/sem à partir Phase 2
+
+---
+
+## Idées non priorisées
+
+À garder pour plus tard ou parking lot :
+- Day/night cycle visuel basé sur l'heure réelle
+- Statistiques par session (temps moyen, nombre de tools, coût estimé)
+- History timeline dans la bulle de dialogue (dernières N actions)
+- Vue mini-map (zoom out vue d'ensemble)
+- Filtrage sidebar par statut/projet/role
+- Click sur projet header pour collapse/expand
+- Sound effects (notification, blocked, etc.)
+- Animation spawn maison quand 1er agent arrive
