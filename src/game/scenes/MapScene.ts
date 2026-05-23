@@ -2,17 +2,13 @@ import Phaser from "phaser";
 import { GRID, layerDepth } from "../config/grid";
 import { AgentSource } from "../services/agentSource";
 import { uiBus, type UiEvents } from "../services/uiBus";
-import type {
-  AgentState,
-  AgentStatus,
-  SubAgentState,
-} from "../../../shared/agent-types";
+import type { AgentState, SubAgentState } from "../../../shared/agent-types";
 import {
   TEACHER_SPRITES,
   STUDENT_SPRITES,
   hashString,
 } from "../../../shared/agent-sprites";
-import { STATUS_COLOR_HEX, STATUS_LABEL } from "../../../shared/agent-ui";
+import { STATUS_LABEL } from "../../../shared/agent-ui";
 import {
   HOUSES,
   STUDENT_OFFSETS,
@@ -22,23 +18,15 @@ import {
   type HouseState,
 } from "../world/houseLayout";
 import {
-  PLAYER_W,
   PLAYER_H,
   PLAYER_SPEED,
   INTERACTION_RADIUS,
-  NPC_SPEED,
-  NPC_PAUSE_MIN,
-  NPC_PAUSE_MAX,
-  NPC_REACH_DIST,
-  NPC_STUCK_TIMEOUT,
-  NPC_WANDER_RADIUS,
-  TARGET_CHAR_HEIGHT,
-  TARGET_NATIVE_HEIGHT,
   HITBOX_W_RATIO,
   HITBOX_H_RATIO,
   CAMERA_ZOOM,
 } from "../world/gameplayConstants";
 import type { Direction, NpcDef, NpcInstance } from "../agents/types";
+import { NpcManager } from "../agents/NpcManager";
 
 const BACKGROUND_KEY = "workspace-background";
 
@@ -76,8 +64,6 @@ export class MapScene extends Phaser.Scene {
     stuckSince?: number;
     lastDist: number;
   };
-  /** IDs of characters whose `right` direction is the flipped `left` sprite. */
-  private charNeedsRightFlip = new Set<string>();
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private interactKey!: Phaser.Input.Keyboard.Key;
   private mouseLabel?: Phaser.GameObjects.Text;
@@ -85,13 +71,11 @@ export class MapScene extends Phaser.Scene {
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
 
   // NPCs + dialogue
-  private npcs: NpcInstance[] = [];
+  private npcManager = new NpcManager(this);
   private nearestNpc?: NpcInstance;
   private promptText?: Phaser.GameObjects.Text;
   private dialogueGroup?: Phaser.GameObjects.Container;
   private dialogueOpenFor?: NpcInstance;
-  /** Phaser physics group containing every NPC sprite. Lets us add/remove at runtime. */
-  private npcGroup!: Phaser.Physics.Arcade.Group;
 
   // Live agent source state
   private agentSource = new AgentSource();
@@ -156,11 +140,15 @@ export class MapScene extends Phaser.Scene {
     }
 
     // Player
-    const playerSpriteKey = this.buildCharacterAnimations("player", "#2b6cb0", "#f6ad55");
+    const playerSpriteKey = this.npcManager.buildCharacterAnimations(
+      "player",
+      "#2b6cb0",
+      "#f6ad55"
+    );
     this.player = this.physics.add.sprite(GRID.width / 2, GRID.height - 100, playerSpriteKey);
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(layerDepth.AGENTS);
-    this.scaleCharacterIfReal(this.player, playerSpriteKey);
+    this.npcManager.scaleCharacterIfReal(this.player, playerSpriteKey);
     const pbody = this.player.body as Phaser.Physics.Arcade.Body;
     const pw = this.player.width;
     const ph = this.player.height;
@@ -178,12 +166,8 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.setZoom(CAMERA_ZOOM);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
-    // NPCs are spawned dynamically from the AgentSource. The collider group is
-    // empty at first; sprites added later via spawnNpc will collide automatically.
-    this.npcGroup = this.physics.add.group();
-    this.physics.add.collider(this.player, this.npcGroup);
-    this.physics.add.collider(this.npcGroup, this.obstacles);
-    this.physics.add.collider(this.npcGroup, this.npcGroup);
+    // NPCs: NpcManager owns the physics group and the colliders.
+    this.npcManager.init({ player: this.player, obstacles: this.obstacles });
 
     // HUD: top-left status line showing connection / agent count.
     this.statusText = this.add
@@ -398,7 +382,7 @@ export class MapScene extends Phaser.Scene {
     if (!placement) return; // all houses are busy with other projects
 
     const def = this.agentToNpcDef(agent, placement.house, placement.slot);
-    const npc = this.spawnNpc(def);
+    const npc = this.npcManager.spawn(def);
     this.teacherNpcs.set(agent.sessionId, npc);
 
     const studentMap = new Map<string, NpcInstance>();
@@ -408,7 +392,7 @@ export class MapScene extends Phaser.Scene {
       const studentNpc = this.spawnStudent(agent, sub, npc);
       if (studentNpc) {
         studentMap.set(sub.id, studentNpc);
-        this.fadeInNpc(studentNpc);
+        this.npcManager.fadeIn(studentNpc);
       }
     }
   }
@@ -428,10 +412,10 @@ export class MapScene extends Phaser.Scene {
     npc.def.currentTool = agent.currentTool;
     npc.def.currentToolDetail = agent.currentToolDetail;
     npc.def.dialogue = statusDialogue(agent);
-    this.refreshStatusBadge(npc);
+    this.npcManager.refreshStatusBadge(npc);
     if (this.dialogueOpenFor === npc) this.refreshDialogue(npc);
     if (prevTool !== agent.currentTool || prevDetail !== agent.currentToolDetail) {
-      this.showActivityBubble(npc);
+      this.npcManager.showActivityBubble(npc);
     }
 
     const studentMap = this.studentNpcs.get(agent.sessionId) ?? new Map();
@@ -450,16 +434,16 @@ export class MapScene extends Phaser.Scene {
         existing.def.currentTool = sub.currentTool;
         existing.def.currentToolDetail = sub.currentToolDetail;
         existing.def.dialogue = statusDialogue(sub);
-        this.refreshStatusBadge(existing);
+        this.npcManager.refreshStatusBadge(existing);
         if (this.dialogueOpenFor === existing) this.refreshDialogue(existing);
         if (subPrevTool !== sub.currentTool || subPrevDetail !== sub.currentToolDetail) {
-          this.showActivityBubble(existing);
+          this.npcManager.showActivityBubble(existing);
         }
       } else {
         const studentNpc = this.spawnStudent(agent, sub, npc);
         if (studentNpc) {
           studentMap.set(sub.id, studentNpc);
-          this.fadeInNpc(studentNpc);
+          this.npcManager.fadeIn(studentNpc);
         }
       }
     }
@@ -470,7 +454,7 @@ export class MapScene extends Phaser.Scene {
       if (studentNpc.despawnAt) continue;
       studentNpc.def.status = "done";
       studentNpc.def.dialogue = "Sub-task complete.";
-      this.refreshStatusBadge(studentNpc);
+      this.npcManager.refreshStatusBadge(studentNpc);
       studentNpc.despawnAt = this.time.now + 2500;
     }
   }
@@ -478,7 +462,7 @@ export class MapScene extends Phaser.Scene {
   private removeAgent(sessionId: string): void {
     const npc = this.teacherNpcs.get(sessionId);
     if (npc) {
-      this.destroyNpc(npc);
+      this.npcManager.destroy(npc);
       this.teacherNpcs.delete(sessionId);
       // Find which cwd this session was housed in and release its slot.
       for (const [cwd, state] of this.housesByCwd) {
@@ -490,7 +474,7 @@ export class MapScene extends Phaser.Scene {
     }
     const students = this.studentNpcs.get(sessionId);
     if (students) {
-      for (const s of students.values()) this.destroyNpc(s);
+      for (const s of students.values()) this.npcManager.destroy(s);
       this.studentNpcs.delete(sessionId);
     }
     if (this.dialogueOpenFor && this.dialogueOpenFor.def.id === sessionId) {
@@ -538,46 +522,7 @@ export class MapScene extends Phaser.Scene {
       sprite: STUDENT_SPRITES[spriteIdx],
       dialogue: statusDialogue(sub),
     };
-    return this.spawnNpc(def);
-  }
-
-  private destroyNpc(npc: NpcInstance): void {
-    npc.statusBadge?.destroy();
-    npc.activityBubble?.destroy();
-    npc.statusGlyph?.destroy();
-    npc.sprite.destroy();
-    const idx = this.npcs.indexOf(npc);
-    if (idx >= 0) this.npcs.splice(idx, 1);
-    if (this.nearestNpc === npc) this.nearestNpc = undefined;
-  }
-
-  /** Fade an NPC's sprite + overlays in over a few hundred ms. */
-  private fadeInNpc(npc: NpcInstance): void {
-    const targets: Phaser.GameObjects.GameObject[] = [npc.sprite];
-    if (npc.statusBadge) targets.push(npc.statusBadge);
-    npc.sprite.setAlpha(0);
-    npc.statusBadge?.setAlpha(0);
-    this.tweens.add({
-      targets,
-      alpha: 1,
-      duration: 350,
-      ease: Phaser.Math.Easing.Quadratic.Out,
-    });
-  }
-
-  /** Fade out + destroy, used at the end of a sub-agent's lifecycle. */
-  private fadeOutAndDestroy(npc: NpcInstance): void {
-    const targets: Phaser.GameObjects.GameObject[] = [npc.sprite];
-    if (npc.statusBadge) targets.push(npc.statusBadge);
-    if (npc.statusGlyph) targets.push(npc.statusGlyph);
-    if (npc.activityBubble) targets.push(npc.activityBubble);
-    this.tweens.add({
-      targets,
-      alpha: 0,
-      duration: 400,
-      ease: Phaser.Math.Easing.Quadratic.In,
-      onComplete: () => this.destroyNpc(npc),
-    });
+    return this.npcManager.spawn(def);
   }
 
   private tickSubAgentDespawns(now: number): void {
@@ -585,122 +530,10 @@ export class MapScene extends Phaser.Scene {
       for (const [id, npc] of Array.from(map.entries())) {
         if (npc.despawnAt && now >= npc.despawnAt) {
           map.delete(id);
-          this.fadeOutAndDestroy(npc);
+          this.npcManager.fadeOutAndDestroy(npc);
         }
       }
     }
-  }
-
-  private refreshStatusBadge(npc: NpcInstance): void {
-    npc.statusBadge?.destroy();
-    npc.statusBadge = this.makeStatusBadge(npc.def.status ?? "idle");
-    this.refreshStatusGlyph(npc);
-  }
-
-  /** ? glyph for awaiting_approval, ! for blocked, nothing otherwise. */
-  private refreshStatusGlyph(npc: NpcInstance): void {
-    const status = npc.def.status;
-    const want = status === "awaiting_approval" || status === "blocked";
-    if (!want) {
-      npc.statusGlyph?.destroy();
-      npc.statusGlyph = undefined;
-      return;
-    }
-    if (npc.statusGlyph) return; // already set; updateStatusGlyph re-positions it each frame
-    const isBlocked = status === "blocked";
-    const text = isBlocked ? "!" : "?";
-    const color = isBlocked ? "#ef4444" : "#eab308";
-    const t = this.add
-      .text(0, 0, text, {
-        fontSize: "20px",
-        fontStyle: "bold",
-        color,
-        stroke: "#000000",
-        strokeThickness: 3,
-      })
-      .setOrigin(0.5, 0.5);
-    const container = this.add.container(0, 0, [t]);
-    container.setSize(t.width, t.height);
-    container.setDepth(layerDepth.OVERLAYS + 2);
-    npc.statusGlyph = container;
-  }
-
-  private updateStatusGlyph(npc: NpcInstance): void {
-    if (!npc.statusGlyph) return;
-    const sprite = npc.sprite;
-    // Gentle bob synced to global time so glyphs all bob in sync (cheap, no tween).
-    const bob = Math.sin(this.time.now / 280) * 3;
-    npc.statusGlyph.setPosition(
-      sprite.x,
-      sprite.y - sprite.displayHeight * 0.5 - 22 + bob
-    );
-    npc.statusGlyph.setDepth(sprite.depth + 3);
-  }
-
-  /**
-   * Show a transient "what they're doing now" bubble above the agent's head.
-   * Replaces any previous bubble for the same agent.
-   */
-  private showActivityBubble(npc: NpcInstance): void {
-    const tool = npc.def.currentTool;
-    if (!tool) {
-      npc.activityBubble?.destroy();
-      npc.activityBubble = undefined;
-      return;
-    }
-    const detail = npc.def.currentToolDetail;
-    const text = detail ? `${tool} · ${detail}` : tool;
-
-    npc.activityBubble?.destroy();
-
-    const padX = 6;
-    const padY = 3;
-    const label = this.add.text(0, 0, text, {
-      fontSize: "10px",
-      color: "#1a202c",
-      wordWrap: { width: 220 },
-    });
-    const w = Math.min(label.width, 220) + padX * 2;
-    const h = label.height + padY * 2 + 4;
-    const bg = this.add.graphics();
-    bg.fillStyle(0xffffff, 0.95);
-    bg.lineStyle(1, 0x111111, 0.9);
-    bg.fillRoundedRect(0, 0, w, h, 5);
-    bg.strokeRoundedRect(0, 0, w, h, 5);
-    bg.fillTriangle(w / 2 - 4, h, w / 2 + 4, h, w / 2, h + 5);
-    bg.lineBetween(w / 2 - 4, h, w / 2, h + 5);
-    bg.lineBetween(w / 2, h + 5, w / 2 + 4, h);
-    label.setPosition(padX, padY);
-
-    const container = this.add.container(0, 0, [bg, label]);
-    container.setSize(w, h);
-    container.setDepth(layerDepth.OVERLAYS);
-    npc.activityBubble = container;
-    this.positionActivityBubble(npc);
-
-    // Auto-fade after 4s.
-    this.tweens.add({
-      targets: container,
-      alpha: 0,
-      delay: 3500,
-      duration: 500,
-      onComplete: () => {
-        if (npc.activityBubble === container) npc.activityBubble = undefined;
-        container.destroy();
-      },
-    });
-  }
-
-  private positionActivityBubble(npc: NpcInstance): void {
-    if (!npc.activityBubble) return;
-    const sprite = npc.sprite;
-    const w = npc.activityBubble.width;
-    const h = npc.activityBubble.height;
-    npc.activityBubble.setPosition(
-      sprite.x - w / 2,
-      sprite.y - sprite.displayHeight * 0.5 - h - 14
-    );
-    npc.activityBubble.setDepth(sprite.depth + 2);
   }
 
   update(): void {
@@ -789,18 +622,12 @@ export class MapScene extends Phaser.Scene {
     }
     this.player.play(`player_${moving ? "walk" : "idle"}_${this.playerLastDir}`, true);
     this.player.setFlipX(
-      this.charNeedsRightFlip.has("player") && this.playerLastDir === "right"
+      this.npcManager.needsRightFlip("player") && this.playerLastDir === "right"
     );
 
-    // NPC AI + y-sort + overlays follow
+    // NPC AI + overlays via the manager (handles wander, badge/glyph/bubble follow).
     const now = this.time.now;
-    for (const npc of this.npcs) {
-      this.updateNpc(npc, now);
-      npc.sprite.setDepth(layerDepth.AGENTS + Math.round(npc.sprite.y));
-      this.updateStatusBadge(npc);
-      this.updateStatusGlyph(npc);
-      this.positionActivityBubble(npc);
-    }
+    this.npcManager.updateAll(now, this.dialogueOpenFor);
 
     // Sub-agent despawn timer: a finished student lingers a short while in
     // `done` so the user can see they completed, then fades out.
@@ -811,163 +638,10 @@ export class MapScene extends Phaser.Scene {
     this.updateDialogueInput();
   }
 
-  // ----- NPCs -----
-
-  private spawnNpc(def: NpcDef): NpcInstance {
-    const spriteKey = this.buildCharacterAnimations(
-      def.id,
-      "#6b7280",
-      "#fcd9b6",
-      def.sprite
-    );
-    const sprite = this.physics.add.sprite(def.x, def.y, spriteKey);
-    sprite.setCollideWorldBounds(true);
-    this.scaleCharacterIfReal(sprite, spriteKey);
-    const body = sprite.body as Phaser.Physics.Arcade.Body;
-    body.pushable = false;
-    body.setSize(sprite.width * HITBOX_W_RATIO, sprite.height * HITBOX_H_RATIO);
-    body.setOffset(
-      sprite.width * (1 - HITBOX_W_RATIO) / 2,
-      sprite.height * (1 - HITBOX_H_RATIO)
-    );
-    sprite.setDepth(layerDepth.AGENTS + Math.round(def.y));
-    sprite.play(`${def.id}_idle_down`);
-
-    if (this.npcGroup) this.npcGroup.add(sprite);
-
-    const instance: NpcInstance = {
-      def,
-      sprite,
-      home: { x: def.x, y: def.y },
-      state: "idle",
-      nextStateAt: this.time.now + Phaser.Math.Between(NPC_PAUSE_MIN, NPC_PAUSE_MAX),
-      lastDir: "down",
-    };
-    instance.statusBadge = this.makeStatusBadge(def.status ?? "idle");
-    this.npcs.push(instance);
-    return instance;
-  }
-
-  private makeStatusBadge(status: AgentStatus): Phaser.GameObjects.Graphics {
-    const g = this.add.graphics();
-    g.fillStyle(STATUS_COLOR_HEX[status], 1);
-    g.fillCircle(0, 0, 5);
-    g.lineStyle(1, 0x111111, 0.9);
-    g.strokeCircle(0, 0, 5);
-    g.setDepth(layerDepth.OVERLAYS);
-    return g;
-  }
-
-  private updateStatusBadge(npc: NpcInstance): void {
-    if (!npc.statusBadge) return;
-    const sprite = npc.sprite;
-    const topY = sprite.y - sprite.displayHeight * 0.5 - 6;
-    npc.statusBadge.setPosition(sprite.x, topY);
-    npc.statusBadge.setDepth(sprite.depth + 1);
-  }
-
-  private updateNpc(npc: NpcInstance, now: number): void {
-    const id = npc.def.id;
-    const playIdle = () => {
-      npc.sprite.play(`${id}_idle_${npc.lastDir}`, true);
-      npc.sprite.setFlipX(this.charNeedsRightFlip.has(id) && npc.lastDir === "right");
-    };
-
-    if (this.dialogueOpenFor === npc) {
-      npc.sprite.setVelocity(0, 0);
-      playIdle();
-      return;
-    }
-
-    // Pinned statuses: the agent stands still. The colour badge + the floating
-    // glyph still tell the user what's going on; movement would be a distraction
-    // when the agent is actually waiting / stuck / done.
-    const status = npc.def.status ?? "idle";
-    if (
-      status === "blocked" ||
-      status === "awaiting_approval" ||
-      status === "done" ||
-      status === "idle"
-    ) {
-      npc.sprite.setVelocity(0, 0);
-      playIdle();
-      return;
-    }
-
-    if (npc.state === "idle") {
-      if (now >= npc.nextStateAt) {
-        npc.target = this.pickWanderTarget(npc);
-        npc.state = "moving";
-        npc.stuckSince = undefined;
-      } else {
-        npc.sprite.setVelocity(0, 0);
-        playIdle();
-      }
-      return;
-    }
-
-    if (!npc.target) {
-      npc.state = "idle";
-      npc.nextStateAt = now + Phaser.Math.Between(NPC_PAUSE_MIN, NPC_PAUSE_MAX);
-      return;
-    }
-
-    const dx = npc.target.x - npc.sprite.x;
-    const dy = npc.target.y - npc.sprite.y;
-    const dist = Math.hypot(dx, dy);
-
-    if (dist < NPC_REACH_DIST) {
-      npc.sprite.setVelocity(0, 0);
-      npc.state = "idle";
-      npc.target = undefined;
-      npc.nextStateAt = now + Phaser.Math.Between(NPC_PAUSE_MIN, NPC_PAUSE_MAX);
-      playIdle();
-      return;
-    }
-
-    const inv = 1 / dist;
-    const vx = dx * inv * NPC_SPEED;
-    const vy = dy * inv * NPC_SPEED;
-    npc.sprite.setVelocity(vx, vy);
-
-    if (Math.abs(vx) >= Math.abs(vy)) {
-      npc.lastDir = vx < 0 ? "left" : "right";
-    } else {
-      npc.lastDir = vy < 0 ? "up" : "down";
-    }
-    npc.sprite.play(`${id}_walk_${npc.lastDir}`, true);
-    npc.sprite.setFlipX(this.charNeedsRightFlip.has(id) && npc.lastDir === "right");
-
-    const body = npc.sprite.body as Phaser.Physics.Arcade.Body;
-    const blocked =
-      body.blocked.left || body.blocked.right || body.blocked.up || body.blocked.down;
-    if (blocked) {
-      npc.stuckSince ??= now;
-      if (now - npc.stuckSince > NPC_STUCK_TIMEOUT) {
-        npc.sprite.setVelocity(0, 0);
-        npc.state = "idle";
-        npc.target = undefined;
-        npc.nextStateAt = now + Phaser.Math.Between(NPC_PAUSE_MIN / 2, NPC_PAUSE_MAX / 2);
-        playIdle();
-      }
-    } else {
-      npc.stuckSince = undefined;
-    }
-  }
-
-  private pickWanderTarget(npc: NpcInstance): { x: number; y: number } {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = Phaser.Math.Between(20, NPC_WANDER_RADIUS);
-    return {
-      x: npc.home.x + Math.cos(angle) * radius,
-      y: npc.home.y + Math.sin(angle) * radius,
-    };
-  }
-
   private updateNearestNpc(): void {
     let best: NpcInstance | undefined;
     let bestDist = INTERACTION_RADIUS;
-    for (const npc of this.npcs) {
+    for (const npc of this.npcManager.npcs) {
       const dx = npc.sprite.x - this.player.x;
       const dy = npc.sprite.y - this.player.y;
       const d = Math.hypot(dx, dy);
@@ -1089,264 +763,6 @@ export class MapScene extends Phaser.Scene {
    * 2-frame placeholder with a simple leg-swap walk cycle.
    * Returns the texture key the sprite should start with.
    */
-  private buildCharacterAnimations(
-    id: string,
-    bodyHex: string,
-    headHex: string,
-    spriteSource?: string
-  ): string {
-    const source = spriteSource ?? id;
-    const imageKey = `${source}_image`;
-
-    if (this.textures.exists(imageKey)) {
-      const img = this.textures.get(imageKey).getSourceImage() as
-        | HTMLImageElement
-        | HTMLCanvasElement;
-      const ratio = img.width / img.height;
-
-      // RPG Maker format: 3 cols × 4 rows. Rows = down/left/right/up.
-      // Cols = step A / idle / step B. Walk loop = 1 → 0 → 1 → 2.
-      if (Math.abs(ratio - 3 / 4) < 0.05 && img.width % 3 === 0 && img.height % 4 === 0) {
-        const sheetKey = `${source}_sheet`;
-        if (!this.textures.exists(sheetKey)) {
-          this.textures.addSpriteSheet(sheetKey, img as HTMLImageElement, {
-            frameWidth: img.width / 3,
-            frameHeight: img.height / 4,
-          });
-        }
-        const rowFor: Record<Direction, number> = { down: 0, left: 1, right: 2, up: 3 };
-        for (const dir of ["down", "left", "right", "up"] as Direction[]) {
-          const r = rowFor[dir];
-          const base = r * 3;
-          const walkKey = `${id}_walk_${dir}`;
-          const idleKey = `${id}_idle_${dir}`;
-          if (!this.anims.exists(walkKey)) {
-            this.anims.create({
-              key: walkKey,
-              frames: [
-                { key: sheetKey, frame: base + 1 },
-                { key: sheetKey, frame: base + 0 },
-                { key: sheetKey, frame: base + 1 },
-                { key: sheetKey, frame: base + 2 },
-              ],
-              frameRate: 6,
-              repeat: -1,
-            });
-          }
-          if (!this.anims.exists(idleKey)) {
-            this.anims.create({
-              key: idleKey,
-              frames: [{ key: sheetKey, frame: base + 1 }],
-              frameRate: 1,
-            });
-          }
-        }
-        return sheetKey;
-      }
-
-      // Legacy single-row 3-frame sheet (front view only): flip for right.
-      this.ensureCleanedTexture(imageKey);
-      const cleanedImg = this.textures.get(imageKey).getSourceImage() as HTMLImageElement;
-      const sheetKey = `${source}_sheet`;
-      if (!this.textures.exists(sheetKey)) {
-        this.textures.addSpriteSheet(sheetKey, cleanedImg, {
-          frameWidth: Math.floor(cleanedImg.width / 3),
-          frameHeight: cleanedImg.height,
-        });
-      }
-      // Same frames for all directions; flip horizontally for right.
-      for (const dir of ["down", "left", "right", "up"] as Direction[]) {
-        const walkKey = `${id}_walk_${dir}`;
-        const idleKey = `${id}_idle_${dir}`;
-        if (!this.anims.exists(walkKey)) {
-          this.anims.create({
-            key: walkKey,
-            frames: this.anims.generateFrameNumbers(sheetKey, { start: 0, end: 2 }),
-            frameRate: 6,
-            repeat: -1,
-          });
-        }
-        if (!this.anims.exists(idleKey)) {
-          this.anims.create({
-            key: idleKey,
-            frames: [{ key: sheetKey, frame: 0 }],
-            frameRate: 1,
-          });
-        }
-      }
-      this.charNeedsRightFlip.add(id);
-      return sheetKey;
-    }
-
-    // Programmatic placeholder fallback.
-    const body = Phaser.Display.Color.HexStringToColor(bodyHex).color;
-    const head = Phaser.Display.Color.HexStringToColor(headHex).color;
-    const f0 = `${id}_f0`;
-    const f1 = `${id}_f1`;
-    if (!this.textures.exists(f0)) this.drawPlaceholderFrame(f0, body, head, 0);
-    if (!this.textures.exists(f1)) this.drawPlaceholderFrame(f1, body, head, 1);
-
-    if (!this.anims.exists(`${id}_walk`)) {
-      this.anims.create({
-        key: `${id}_walk`,
-        frames: [{ key: f0 }, { key: f1 }],
-        frameRate: 6,
-        repeat: -1,
-      });
-    }
-    if (!this.anims.exists(`${id}_idle`)) {
-      this.anims.create({
-        key: `${id}_idle`,
-        frames: [{ key: f0 }],
-        frameRate: 1,
-      });
-    }
-    return f0;
-  }
-
-  /** Scale a sprite to TARGET_CHAR_HEIGHT only if it's backed by a real spritesheet. */
-  private scaleCharacterIfReal(
-    sprite: Phaser.Physics.Arcade.Sprite,
-    initialKey: string
-  ): void {
-    if (initialKey.endsWith("_f0")) return; // programmatic placeholder, leave native size
-    const naturalH = sprite.height;
-    if (naturalH <= 0) return;
-    const scale = TARGET_CHAR_HEIGHT / naturalH;
-    sprite.setScale(scale);
-  }
-
-  /**
-   * Replace `imageKey` with a transparency-cleaned version. Two cleanup passes:
-   *   1. Chroma-key magenta (#FF00FF ± tolerance) — for AI sprites that use solid color BG.
-   *   2. Flood-fill from corners — for AI sprites that bake the "transparency
-   *      checkerboard" into actual pixels.
-   * Both passes are safe no-ops when the source is genuinely transparent.
-   */
-  private ensureCleanedTexture(imageKey: string): void {
-    if (!this.textures.exists(imageKey)) return;
-    const tex = this.textures.get(imageKey);
-    if ((tex as unknown as { __cleaned?: boolean }).__cleaned) return;
-
-    const source = tex.getSourceImage() as HTMLImageElement | HTMLCanvasElement;
-    const w = source.width;
-    const h = source.height;
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-    ctx.drawImage(source, 0, 0);
-
-    const imageData = ctx.getImageData(0, 0, w, h);
-    const data = imageData.data;
-
-    // Pass 1: chroma-key magenta (R high, G low, B high).
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] > 200 && data[i + 1] < 80 && data[i + 2] > 200) {
-        data[i + 3] = 0;
-      }
-    }
-
-    // Pass 2: checkerboard flood-fill (kept for legacy AI sprites).
-    if (data[3] > 0) {
-      // Only run if the top-left pixel isn't already transparent (i.e. magenta key didn't catch it).
-      const c1: [number, number, number] = [data[0], data[1], data[2]];
-      let c2: [number, number, number] = c1;
-      for (let x = 1; x < Math.min(w, 64); x++) {
-        const i = x * 4;
-        if (Math.abs(data[i] - c1[0]) > 12) {
-          c2 = [data[i], data[i + 1], data[i + 2]];
-          break;
-        }
-      }
-      const TOL = 10;
-      const isBg = (r: number, g: number, b: number) =>
-        (Math.abs(r - c1[0]) <= TOL && Math.abs(g - c1[1]) <= TOL && Math.abs(b - c1[2]) <= TOL) ||
-        (Math.abs(r - c2[0]) <= TOL && Math.abs(g - c2[1]) <= TOL && Math.abs(b - c2[2]) <= TOL);
-      const visited = new Uint8Array(w * h);
-      const stack: number[] = [];
-      const tryPush = (x: number, y: number) => {
-        if (x < 0 || x >= w || y < 0 || y >= h) return;
-        const idx = y * w + x;
-        if (visited[idx]) return;
-        visited[idx] = 1;
-        const p = idx * 4;
-        if (data[p + 3] > 0 && isBg(data[p], data[p + 1], data[p + 2])) {
-          data[p + 3] = 0;
-          stack.push(idx);
-        }
-      };
-      tryPush(0, 0);
-      tryPush(w - 1, 0);
-      tryPush(0, h - 1);
-      tryPush(w - 1, h - 1);
-      while (stack.length) {
-        const idx = stack.pop()!;
-        const x = idx % w;
-        const y = (idx - x) / w;
-        tryPush(x - 1, y);
-        tryPush(x + 1, y);
-        tryPush(x, y - 1);
-        tryPush(x, y + 1);
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-
-    // Downsample to TARGET_NATIVE_HEIGHT so the texture's native pixel density
-    // matches the map's chunky pixel art. The chroma-key already made the BG
-    // transparent, so bilinear downsampling antialiases the character edges
-    // against alpha=0 instead of leaving magenta fringe.
-    let finalCanvas: HTMLCanvasElement = canvas;
-    if (h > TARGET_NATIVE_HEIGHT * 1.5) {
-      const scale = TARGET_NATIVE_HEIGHT / h;
-      const small = document.createElement("canvas");
-      small.width = Math.max(1, Math.round(w * scale));
-      small.height = Math.max(1, Math.round(h * scale));
-      const sctx = small.getContext("2d")!;
-      sctx.imageSmoothingEnabled = true;
-      sctx.imageSmoothingQuality = "high";
-      sctx.drawImage(canvas, 0, 0, small.width, small.height);
-      finalCanvas = small;
-    }
-
-    this.textures.remove(imageKey);
-    this.textures.addCanvas(imageKey, finalCanvas);
-    (this.textures.get(imageKey) as unknown as { __cleaned?: boolean }).__cleaned = true;
-  }
-
-  private drawPlaceholderFrame(
-    key: string,
-    body: number,
-    head: number,
-    frame: 0 | 1
-  ): void {
-    const W = PLAYER_W;
-    const H = PLAYER_H;
-    const PANTS = 0x1a202c;
-    const g = this.add.graphics();
-    // Torso
-    g.fillStyle(body, 1);
-    g.fillRect(2, 14, W - 4, H - 16 - 4);
-    // Head
-    g.fillStyle(head, 1);
-    g.fillRect(6, 2, W - 12, 12);
-    // Legs: frame 0 standing, frame 1 spread (visible walk step)
-    g.fillStyle(PANTS, 1);
-    if (frame === 0) {
-      g.fillRect(7, 26, 4, 6);
-      g.fillRect(13, 26, 4, 6);
-    } else {
-      g.fillRect(5, 25, 4, 7);
-      g.fillRect(15, 25, 4, 7);
-    }
-    g.lineStyle(1, 0x111111, 1);
-    g.strokeRect(2, 14, W - 4, H - 16 - 4);
-    g.strokeRect(6, 2, W - 12, 12);
-    g.generateTexture(key, W, H);
-    g.destroy();
-  }
-
   // ----- Obstacles -----
 
   private addObstacle(rect: CollisionRect): Phaser.GameObjects.Zone {
