@@ -19,7 +19,7 @@
 
 | ID | Story | Effort | Statut |
 |---|---|---|---|
-| S1.1 | Refactor `MapScene.ts` en 7 modules | 4j | en cours |
+| S1.1 | Refactor `MapScene.ts` en 7 modules | 4j | **livré** (5 commits, MapScene 1690 → 151 lignes) |
 | S1.2 | Reconnect SSE robuste + ErrorBoundary | 1j | à faire |
 | S1.3 | Logger structuré server-side | 0.5j | à faire |
 | S1.4 | Vitest setup + tests `parser.ts` | 1j | à faire |
@@ -30,6 +30,35 @@
 - **Cible architecture** : 7 modules pour MapScene (NpcManager, AgentSyncer, PlayerController, DialogueUI, HouseLayout, CollisionLayer + orchestrator MapScene). Voir le détail dans le kickoff Sprint 1.
 - **Pas de framework de test côté frontend** ce sprint. On verra au Sprint 2 si on en a besoin.
 - **Logger pino** retenu sur consola pour la perf JSON natif.
+
+### S1.1 livrée — récap
+
+5 commits successifs, `tsc --noEmit` vert à chaque pas, vérification visuelle à mi-parcours (après commit C) :
+
+| Commit | Sujet | Résultat |
+|---|---|---|
+| `56faa62` | A — Mutualiser status colours/labels dans shared/agent-ui | MapScene + sidebar agrees |
+| `(B)` | Extract HouseLayout + gameplay constants + agents/types | Types/constants hors classe |
+| `457e1b6` | C — NpcManager (sprites, lifecycle, overlays, wander) | MapScene 1690 → 948 |
+| `(D)` | DialogueUI + PlayerController | 948 → 651 |
+| `34a3dad` | E1 — AgentSyncer | 651 → 358 |
+| `41dbb32` | E2 — CollisionLayer, MapScene pur orchestrator | 358 → **151** |
+
+Distribution finale des 9 fichiers issus de S1.1 :
+
+```
+MapScene.ts            151
+AgentSyncer.ts         331
+NpcManager.ts          619   ← seul dépasse la cible de 400, voir PT.5
+CollisionLayer.ts      246
+PlayerController.ts    253
+DialogueUI.ts          132
+houseLayout.ts         111
+gameplayConstants.ts    42
+agents/types.ts         44
+```
+
+NpcManager reste épais à cause du sprite loader (buildCharacterAnimations + ensureCleanedTexture + drawPlaceholderFrame ≈ 250 lignes). Ajouté en dette dans le backlog (PT.5).
 
 ### Retro (à compléter en fin de sprint)
 

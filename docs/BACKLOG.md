@@ -17,7 +17,7 @@ But : PoC → outil installable, stable, partageable.
 
 ### Sprint 1 — Stabilisation (en cours)
 
-- [~] **S1.1** Refactor `MapScene.ts` en 7 modules (~4j)
+- [x] **S1.1** Refactor `MapScene.ts` en 7 modules (~4j) — livré en 5 commits
 - [ ] **S1.2** Reconnect SSE robuste + React ErrorBoundary (~1j)
 - [ ] **S1.3** Logger structuré server-side + cleanup `console.*` (~0.5j)
 - [ ] **S1.4** Vitest setup + tests sur `parser.ts` (~1j)
@@ -168,10 +168,11 @@ But : démontrer une willingness to pay.
 
 ## Chantiers transverses (toutes phases)
 
-- [ ] **PT.1** Mutualiser `STATUS_COLOR`/`STATUS_LABEL` dans `shared/agent-ui.ts` (Sprint 1)
+- [x] **PT.1** Mutualiser `STATUS_COLOR`/`STATUS_LABEL` dans `shared/agent-ui.ts` — fait dans S1.1.A (commit 56faa62)
 - [ ] **PT.2** Bus factor : code propre + ADRs + docs continus
 - [ ] **PT.3** Dogfooding : utiliser le widget chaque jour, noter friction
 - [ ] **PT.4** User interviews : 2 calls/sem à partir Phase 2
+- [ ] **PT.5** Split `NpcManager` (619 lignes) : extraire `CharacterSpriteFactory` (buildCharacterAnimations + ensureCleanedTexture + drawPlaceholderFrame) du `NpcManager` (lifecycle / wander / overlays). Cible ≤ 400 lignes chacun. À programmer dans Sprint 2 ou 3.
 
 ---
 
