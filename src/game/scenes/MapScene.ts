@@ -2,103 +2,45 @@ import Phaser from "phaser";
 import { GRID, layerDepth } from "../config/grid";
 import { AgentSource } from "../services/agentSource";
 import { uiBus, type UiEvents } from "../services/uiBus";
-import type { AgentState, SubAgentState } from "../../../shared/agent-types";
+import type {
+  AgentState,
+  AgentStatus,
+  SubAgentState,
+} from "../../../shared/agent-types";
 import {
   TEACHER_SPRITES,
   STUDENT_SPRITES,
   hashString,
 } from "../../../shared/agent-sprites";
 import { STATUS_COLOR_HEX, STATUS_LABEL } from "../../../shared/agent-ui";
+import {
+  HOUSES,
+  STUDENT_OFFSETS,
+  statusDialogue,
+  teacherPosition,
+  type House,
+  type HouseState,
+} from "../world/houseLayout";
+import {
+  PLAYER_W,
+  PLAYER_H,
+  PLAYER_SPEED,
+  INTERACTION_RADIUS,
+  NPC_SPEED,
+  NPC_PAUSE_MIN,
+  NPC_PAUSE_MAX,
+  NPC_REACH_DIST,
+  NPC_STUCK_TIMEOUT,
+  NPC_WANDER_RADIUS,
+  TARGET_CHAR_HEIGHT,
+  TARGET_NATIVE_HEIGHT,
+  HITBOX_W_RATIO,
+  HITBOX_H_RATIO,
+  CAMERA_ZOOM,
+} from "../world/gameplayConstants";
+import type { Direction, NpcDef, NpcInstance } from "../agents/types";
 
 const BACKGROUND_KEY = "workspace-background";
-
-interface House {
-  id: string;
-  building: string;
-  /** Centre where the main agent (teacher) wanders around. */
-  center: { x: number; y: number };
-  /** Point on the path right outside the stairs — used as a waypoint for auto-walk. */
-  entrance: { x: number; y: number };
-}
-
-interface HouseState {
-  house: House;
-  cwd: string;
-  /** sessionId → slot index used to position the teacher inside the house. */
-  teachers: Map<string, number>;
-  /** Project name banner rendered above the house. */
-  label?: Phaser.GameObjects.Text;
-}
-
-const HOUSES: House[] = [
-  // `entrance` is the small gap at the bottom of each building (the stairs).
-  // Derived from collisions.json: Claude gap x≈266→325, Review x≈667→728,
-  // Monitoring x≈1090→1160. y just below the stairs in the path area.
-  {
-    id: "house_claude",
-    building: "CLAUDE",
-    center: { x: 290, y: 220 },
-    entrance: { x: 295, y: 450 },
-  },
-  {
-    id: "house_review",
-    building: "REVIEW",
-    center: { x: 720, y: 220 },
-    entrance: { x: 697, y: 450 },
-  },
-  {
-    id: "house_monitoring",
-    building: "MONITORING",
-    center: { x: 1150, y: 220 },
-    entrance: { x: 1125, y: 450 },
-  },
-];
-
-
-/** Where each successive teacher stands inside the same house (a project). */
-const TEACHER_SLOT_OFFSETS: Array<{ dx: number; dy: number }> = [
-  { dx: 0, dy: 0 },
-  { dx: -90, dy: 30 },
-  { dx: 90, dy: 30 },
-  { dx: -45, dy: -50 },
-  { dx: 45, dy: -50 },
-];
-
-/** Offsets around the teacher's home where students wander. */
-const STUDENT_OFFSETS: Array<{ dx: number; dy: number }> = [
-  { dx: -70, dy: 40 },
-  { dx: 70, dy: 40 },
-  { dx: -70, dy: -30 },
-  { dx: 70, dy: -30 },
-  { dx: 0, dy: 60 },
-  { dx: 0, dy: -50 },
-  { dx: -100, dy: 0 },
-  { dx: 100, dy: 0 },
-];
-
-function statusDialogue(agent: AgentState | SubAgentState): string {
-  // Prefer the rich tool detail (e.g. "npm run dev", "src/MapScene.ts") when present.
-  if (agent.currentToolDetail) return agent.currentToolDetail;
-  const tool = agent.currentTool ? ` (${agent.currentTool})` : "";
-  switch (agent.status) {
-    case "planning":
-      return "Construit le plan.";
-    case "awaiting_approval":
-      return "Plan prêt — j'attends ta validation.";
-    case "coding":
-      return `Modifie les fichiers${tool}.`;
-    case "running_tool":
-      return `Exécute ${agent.currentTool || "un outil"}.`;
-    case "idle":
-      return "Au repos.";
-    case "done":
-      return "Tour terminé.";
-    case "blocked":
-      return "Bloqué — besoin d'aide.";
-    default:
-      return "—";
-  }
-}
 
 interface CollisionRect {
   id: string;
@@ -114,69 +56,6 @@ interface CollisionsFile {
   description?: string;
   rects: CollisionRect[];
 }
-
-type AgentStatus =
-  | "planning"
-  | "awaiting_approval"
-  | "coding"
-  | "running_tool"
-  | "idle"
-  | "done"
-  | "blocked";
-
-interface NpcDef {
-  id: string;
-  name: string;
-  building?: string;
-  /** Free-form role label (e.g. "teacher", "student"). */
-  role?: string;
-  /** Current agent status. Drives the badge colour and the dialogue line. */
-  status?: AgentStatus;
-  /** Current tool name (shown in dialogue header next to status). */
-  currentTool?: string;
-  /** Current tool detail (file path, command, etc.) — populated from AgentState. */
-  currentToolDetail?: string;
-  /** For students: id of the teacher they're spawned by. */
-  parentId?: string;
-  x: number;
-  y: number;
-  /** Fallback dialogue line shown if no live tool detail is available. */
-  dialogue: string;
-  /** Filename (without extension) under /assets/sprites/. */
-  sprite: string;
-}
-
-interface NpcInstance {
-  def: NpcDef;
-  sprite: Phaser.Physics.Arcade.Sprite;
-  home: { x: number; y: number };
-  state: "idle" | "moving";
-  target?: { x: number; y: number };
-  nextStateAt: number;
-  stuckSince?: number;
-  lastDir: Direction;
-  statusBadge?: Phaser.GameObjects.Graphics;
-  /** Live activity bubble shown briefly when the agent starts a new tool. */
-  activityBubble?: Phaser.GameObjects.Container;
-  /** Floating ? / ! glyph for awaiting_approval or blocked statuses. */
-  statusGlyph?: Phaser.GameObjects.Container;
-  /** When set, the sub-agent should be despawned at this time (post-done linger). */
-  despawnAt?: number;
-}
-
-type Direction = "down" | "left" | "right" | "up";
-
-const PLAYER_W = 24;
-const PLAYER_H = 32;
-const PLAYER_SPEED = 220;
-const INTERACTION_RADIUS = 90;
-
-const NPC_SPEED = 55;
-const NPC_WANDER_RADIUS = 80;
-const NPC_PAUSE_MIN = 1500;
-const NPC_PAUSE_MAX = 4000;
-const NPC_REACH_DIST = 6;
-const NPC_STUCK_TIMEOUT = 400;
 
 interface DrawnRect {
   rect: CollisionRect;
@@ -259,19 +138,6 @@ export class MapScene extends Phaser.Scene {
     });
   }
 
-  /** Final on-screen height (px) for any character with a real sprite. */
-  private static readonly TARGET_CHAR_HEIGHT = 64;
-  /** Hitbox = fraction of the sprite. Centred horizontally, anchored at feet. */
-  private static readonly HITBOX_W_RATIO = 0.7;
-  private static readonly HITBOX_H_RATIO = 0.5;
-  /** Camera zoom level — 1.0 shows the whole map, >1 zooms in on the player. */
-  private static readonly CAMERA_ZOOM = 1.2;
-  /**
-   * Native texture height (px) after downsample. Smaller than the displayed
-   * size on purpose: when Phaser scales it back up with nearest-neighbour,
-   * we get visible chunky pixels that match the map's pixel art density.
-   */
-  private static readonly TARGET_NATIVE_HEIGHT = 32;
 
   create(): void {
     // Background
@@ -298,10 +164,10 @@ export class MapScene extends Phaser.Scene {
     const pbody = this.player.body as Phaser.Physics.Arcade.Body;
     const pw = this.player.width;
     const ph = this.player.height;
-    pbody.setSize(pw * MapScene.HITBOX_W_RATIO, ph * MapScene.HITBOX_H_RATIO);
+    pbody.setSize(pw * HITBOX_W_RATIO, ph * HITBOX_H_RATIO);
     pbody.setOffset(
-      pw * (1 - MapScene.HITBOX_W_RATIO) / 2,
-      ph * (1 - MapScene.HITBOX_H_RATIO)
+      pw * (1 - HITBOX_W_RATIO) / 2,
+      ph * (1 - HITBOX_H_RATIO)
     );
     this.player.play("player_idle_down");
 
@@ -309,7 +175,7 @@ export class MapScene extends Phaser.Scene {
 
     // Camera: smooth follow + slight zoom, clamped to the map.
     this.cameras.main.setBounds(0, 0, GRID.width, GRID.height);
-    this.cameras.main.setZoom(MapScene.CAMERA_ZOOM);
+    this.cameras.main.setZoom(CAMERA_ZOOM);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
     // NPCs are spawned dynamically from the AgentSource. The collider group is
@@ -520,11 +386,6 @@ export class MapScene extends Phaser.Scene {
     return label;
   }
 
-  private teacherPosition(house: House, slot: number): { x: number; y: number } {
-    const offset = TEACHER_SLOT_OFFSETS[slot % TEACHER_SLOT_OFFSETS.length];
-    return { x: house.center.x + offset.dx, y: house.center.y + offset.dy };
-  }
-
   private spawnAgent(agent: AgentState): void {
     if (this.teacherNpcs.has(agent.sessionId)) {
       this.updateAgent(agent);
@@ -638,7 +499,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   private agentToNpcDef(agent: AgentState, house: House, slot: number): NpcDef {
-    const pos = this.teacherPosition(house, slot);
+    const pos = teacherPosition(house, slot);
     const spriteIdx = hashString(agent.sessionId) % TEACHER_SPRITES.length;
     return {
       id: agent.sessionId,
@@ -964,10 +825,10 @@ export class MapScene extends Phaser.Scene {
     this.scaleCharacterIfReal(sprite, spriteKey);
     const body = sprite.body as Phaser.Physics.Arcade.Body;
     body.pushable = false;
-    body.setSize(sprite.width * MapScene.HITBOX_W_RATIO, sprite.height * MapScene.HITBOX_H_RATIO);
+    body.setSize(sprite.width * HITBOX_W_RATIO, sprite.height * HITBOX_H_RATIO);
     body.setOffset(
-      sprite.width * (1 - MapScene.HITBOX_W_RATIO) / 2,
-      sprite.height * (1 - MapScene.HITBOX_H_RATIO)
+      sprite.width * (1 - HITBOX_W_RATIO) / 2,
+      sprite.height * (1 - HITBOX_H_RATIO)
     );
     sprite.setDepth(layerDepth.AGENTS + Math.round(def.y));
     sprite.play(`${def.id}_idle_down`);
@@ -1351,7 +1212,7 @@ export class MapScene extends Phaser.Scene {
     if (initialKey.endsWith("_f0")) return; // programmatic placeholder, leave native size
     const naturalH = sprite.height;
     if (naturalH <= 0) return;
-    const scale = MapScene.TARGET_CHAR_HEIGHT / naturalH;
+    const scale = TARGET_CHAR_HEIGHT / naturalH;
     sprite.setScale(scale);
   }
 
@@ -1437,8 +1298,8 @@ export class MapScene extends Phaser.Scene {
     // transparent, so bilinear downsampling antialiases the character edges
     // against alpha=0 instead of leaving magenta fringe.
     let finalCanvas: HTMLCanvasElement = canvas;
-    if (h > MapScene.TARGET_NATIVE_HEIGHT * 1.5) {
-      const scale = MapScene.TARGET_NATIVE_HEIGHT / h;
+    if (h > TARGET_NATIVE_HEIGHT * 1.5) {
+      const scale = TARGET_NATIVE_HEIGHT / h;
       const small = document.createElement("canvas");
       small.width = Math.max(1, Math.round(w * scale));
       small.height = Math.max(1, Math.round(h * scale));
