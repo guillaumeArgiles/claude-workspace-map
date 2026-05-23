@@ -8,6 +8,7 @@ import {
   STUDENT_SPRITES,
   hashString,
 } from "../../../shared/agent-sprites";
+import { STATUS_COLOR_HEX, STATUS_LABEL } from "../../../shared/agent-ui";
 
 const BACKGROUND_KEY = "workspace-background";
 
@@ -144,26 +145,6 @@ interface NpcDef {
   /** Filename (without extension) under /assets/sprites/. */
   sprite: string;
 }
-
-const STATUS_COLOR: Record<AgentStatus, number> = {
-  planning: 0x3b82f6,         // blue
-  awaiting_approval: 0xeab308, // yellow
-  coding: 0x10b981,            // green
-  running_tool: 0x06b6d4,      // cyan
-  idle: 0x9ca3af,              // gray
-  done: 0x22c55e,              // lime
-  blocked: 0xef4444,           // red
-};
-
-const STATUS_LABEL: Record<AgentStatus, string> = {
-  planning: "Planning",
-  awaiting_approval: "Awaiting approval",
-  coding: "Coding",
-  running_tool: "Running tool",
-  idle: "Idle",
-  done: "Done",
-  blocked: "Blocked",
-};
 
 interface NpcInstance {
   def: NpcDef;
@@ -1008,7 +989,7 @@ export class MapScene extends Phaser.Scene {
 
   private makeStatusBadge(status: AgentStatus): Phaser.GameObjects.Graphics {
     const g = this.add.graphics();
-    g.fillStyle(STATUS_COLOR[status], 1);
+    g.fillStyle(STATUS_COLOR_HEX[status], 1);
     g.fillCircle(0, 0, 5);
     g.lineStyle(1, 0x111111, 0.9);
     g.strokeCircle(0, 0, 5);

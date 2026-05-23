@@ -2,53 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   AgentState,
   ServerEvent,
-  AgentStatus,
   SubAgentState,
 } from "../../shared/agent-types";
 import {
   teacherSpriteFor,
   studentSpriteFor,
 } from "../../shared/agent-sprites";
+import { STATUS_COLOR, STATUS_LABEL, statusOrder } from "../../shared/agent-ui";
 import { uiBus } from "../game/services/uiBus";
-
-const STATUS_COLOR: Record<AgentStatus, string> = {
-  planning: "#3b82f6",
-  awaiting_approval: "#eab308",
-  coding: "#10b981",
-  running_tool: "#06b6d4",
-  idle: "#9ca3af",
-  done: "#22c55e",
-  blocked: "#ef4444",
-};
-
-const STATUS_LABEL: Record<AgentStatus, string> = {
-  planning: "Planning",
-  awaiting_approval: "Awaiting approval",
-  coding: "Coding",
-  running_tool: "Running tool",
-  idle: "Idle",
-  done: "Done",
-  blocked: "Blocked",
-};
-
-function statusOrder(s: AgentStatus): number {
-  switch (s) {
-    case "awaiting_approval":
-      return 0;
-    case "blocked":
-      return 1;
-    case "running_tool":
-    case "coding":
-    case "planning":
-      return 2;
-    case "done":
-      return 3;
-    case "idle":
-      return 4;
-    default:
-      return 5;
-  }
-}
 
 /**
  * One frame of the RPG-Maker sheet (96×128, 3 cols × 4 rows). Frame (col=1,
