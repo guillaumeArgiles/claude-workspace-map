@@ -8,7 +8,6 @@ import {
   STUDENT_SPRITES,
   hashString,
 } from "../../../shared/agent-sprites";
-import { STATUS_LABEL } from "../../../shared/agent-ui";
 import {
   HOUSES,
   STUDENT_OFFSETS,
@@ -17,16 +16,11 @@ import {
   type House,
   type HouseState,
 } from "../world/houseLayout";
-import {
-  PLAYER_H,
-  PLAYER_SPEED,
-  INTERACTION_RADIUS,
-  HITBOX_W_RATIO,
-  HITBOX_H_RATIO,
-  CAMERA_ZOOM,
-} from "../world/gameplayConstants";
-import type { Direction, NpcDef, NpcInstance } from "../agents/types";
+import { CAMERA_ZOOM } from "../world/gameplayConstants";
+import type { NpcDef, NpcInstance } from "../agents/types";
 import { NpcManager } from "../agents/NpcManager";
+import { DialogueUI } from "../ui/DialogueUI";
+import { PlayerController } from "../player/PlayerController";
 
 const BACKGROUND_KEY = "workspace-background";
 
@@ -55,27 +49,17 @@ interface DrawnRect {
 export class MapScene extends Phaser.Scene {
   private previewGrid = false;
   private debugMode = false;
-  private player!: Phaser.Physics.Arcade.Sprite;
-  private playerLastDir: Direction = "down";
-  /** Optional autopilot: when set, the player walks through these waypoints. */
-  private playerAutoWalk?: {
-    waypoints: Array<{ x: number; y: number }>;
-    targetId: string;
-    stuckSince?: number;
-    lastDist: number;
-  };
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private interactKey!: Phaser.Input.Keyboard.Key;
   private mouseLabel?: Phaser.GameObjects.Text;
   private helpLabel?: Phaser.GameObjects.Text;
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
 
-  // NPCs + dialogue
+  // Character + UI managers
   private npcManager = new NpcManager(this);
-  private nearestNpc?: NpcInstance;
-  private promptText?: Phaser.GameObjects.Text;
-  private dialogueGroup?: Phaser.GameObjects.Container;
-  private dialogueOpenFor?: NpcInstance;
+  private dialogue = new DialogueUI(this);
+  private playerController = new PlayerController(this, this.npcManager, this.dialogue, {
+    findNpcById: (id) => this.findNpcById(id),
+    findHouseForNpc: (npc) => this.findHouseForNpc(npc),
+  });
 
   // Live agent source state
   private agentSource = new AgentSource();
@@ -139,35 +123,23 @@ export class MapScene extends Phaser.Scene {
       if (this.debugMode) this.drawDebugRect(rect);
     }
 
-    // Player
-    const playerSpriteKey = this.npcManager.buildCharacterAnimations(
-      "player",
-      "#2b6cb0",
-      "#f6ad55"
-    );
-    this.player = this.physics.add.sprite(GRID.width / 2, GRID.height - 100, playerSpriteKey);
-    this.player.setCollideWorldBounds(true);
-    this.player.setDepth(layerDepth.AGENTS);
-    this.npcManager.scaleCharacterIfReal(this.player, playerSpriteKey);
-    const pbody = this.player.body as Phaser.Physics.Arcade.Body;
-    const pw = this.player.width;
-    const ph = this.player.height;
-    pbody.setSize(pw * HITBOX_W_RATIO, ph * HITBOX_H_RATIO);
-    pbody.setOffset(
-      pw * (1 - HITBOX_W_RATIO) / 2,
-      ph * (1 - HITBOX_H_RATIO)
-    );
-    this.player.play("player_idle_down");
-
-    this.physics.add.collider(this.player, this.obstacles);
+    // Player (PlayerController owns sprite + keyboard + autopilot).
+    const player = this.playerController.init({
+      x: GRID.width / 2,
+      y: GRID.height - 100,
+    });
+    this.physics.add.collider(player, this.obstacles);
 
     // Camera: smooth follow + slight zoom, clamped to the map.
     this.cameras.main.setBounds(0, 0, GRID.width, GRID.height);
     this.cameras.main.setZoom(CAMERA_ZOOM);
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.cameras.main.startFollow(player, true, 0.12, 0.12);
 
     // NPCs: NpcManager owns the physics group and the colliders.
-    this.npcManager.init({ player: this.player, obstacles: this.obstacles });
+    this.npcManager.init({ player, obstacles: this.obstacles });
+
+    // Dialogue UI (prompt + bubble container).
+    this.dialogue.init();
 
     // HUD: top-left status line showing connection / agent count.
     this.statusText = this.add
@@ -182,30 +154,15 @@ export class MapScene extends Phaser.Scene {
 
     this.startAgentSource();
 
-    // UI: hover prompt + dialogue container
-    this.promptText = this.add
-      .text(0, 0, "", {
-        fontSize: "12px",
-        color: "#ffffff",
-        backgroundColor: "#000000cc",
-        padding: { x: 6, y: 3 },
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(layerDepth.OVERLAYS)
-      .setVisible(false);
-
-    // Controls
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-
     if (this.previewGrid) this.drawPreviewGrid();
     if (this.debugMode) {
       this.enableDebugOverlay();
       this.enableDrawingTool();
     }
 
-    // UI bus → highlight an agent when the sidebar fires the intent.
-    const onHighlight = (data: UiEvents["highlight_agent"]) => this.highlightAgent(data.id);
+    // UI bus → click in the sidebar pops the bounce + sends the player walking.
+    const onHighlight = (data: UiEvents["highlight_agent"]) =>
+      this.playerController.highlightAgent(data.id);
     uiBus.on("highlight_agent", onHighlight);
 
     const cleanup = () => {
@@ -216,51 +173,15 @@ export class MapScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.DESTROY, cleanup);
   }
 
-  /**
-   * Pop a quick "found you!" effect on the agent + send the player walking
-   * over via the house entrance. Cancels itself on any arrow key.
-   */
-  private highlightAgent(id: string): void {
-    const npc = this.teacherNpcs.get(id) ?? this.findStudentNpc(id);
-    if (!npc) return;
-
-    // Visual confirmation: a short hop on the agent.
-    const sprite = npc.sprite;
-    const restY = sprite.y;
-    this.tweens.add({
-      targets: sprite,
-      y: restY - 14,
-      duration: 160,
-      ease: Phaser.Math.Easing.Quadratic.Out,
-      yoyo: true,
-      repeat: 1,
-      onComplete: () => sprite.setY(restY),
-    });
-
-    // Send the player walking.
-    this.startAutoWalk(npc);
-  }
-
-  /** Build a list of waypoints from the player to an NPC and trigger the autopilot. */
-  private startAutoWalk(npc: NpcInstance): void {
-    const house = this.findHouseForNpc(npc);
-    const waypoints: Array<{ x: number; y: number }> = [];
-
-    // If the player is below the buildings, route via the entrance first to
-    // avoid running into the back walls.
-    const alreadyInside = house ? this.player.y < house.center.y + 140 : true;
-    if (house && !alreadyInside) {
-      waypoints.push({ x: house.entrance.x, y: house.entrance.y });
+  /** Resolve an NPC by id (sessionId for teachers, sub-id for students). */
+  private findNpcById(id: string): NpcInstance | undefined {
+    const teacher = this.teacherNpcs.get(id);
+    if (teacher) return teacher;
+    for (const map of this.studentNpcs.values()) {
+      const npc = map.get(id);
+      if (npc) return npc;
     }
-    // Final waypoint: a couple of pixels below the agent so the player ends up
-    // facing them, not standing on top.
-    waypoints.push({ x: npc.sprite.x, y: npc.sprite.y + 24 });
-
-    this.playerAutoWalk = {
-      waypoints,
-      targetId: npc.def.id,
-      lastDist: Infinity,
-    };
+    return undefined;
   }
 
   private findHouseForNpc(npc: NpcInstance): House | undefined {
@@ -269,14 +190,6 @@ export class MapScene extends Phaser.Scene {
     if (!sessionId) return undefined;
     for (const state of this.housesByCwd.values()) {
       if (state.teachers.has(sessionId)) return state.house;
-    }
-    return undefined;
-  }
-
-  private findStudentNpc(subId: string): NpcInstance | undefined {
-    for (const map of this.studentNpcs.values()) {
-      const npc = map.get(subId);
-      if (npc) return npc;
     }
     return undefined;
   }
@@ -413,7 +326,7 @@ export class MapScene extends Phaser.Scene {
     npc.def.currentToolDetail = agent.currentToolDetail;
     npc.def.dialogue = statusDialogue(agent);
     this.npcManager.refreshStatusBadge(npc);
-    if (this.dialogueOpenFor === npc) this.refreshDialogue(npc);
+    if (this.dialogue.openNpc === npc) this.dialogue.refresh(npc);
     if (prevTool !== agent.currentTool || prevDetail !== agent.currentToolDetail) {
       this.npcManager.showActivityBubble(npc);
     }
@@ -435,7 +348,7 @@ export class MapScene extends Phaser.Scene {
         existing.def.currentToolDetail = sub.currentToolDetail;
         existing.def.dialogue = statusDialogue(sub);
         this.npcManager.refreshStatusBadge(existing);
-        if (this.dialogueOpenFor === existing) this.refreshDialogue(existing);
+        if (this.dialogue.openNpc === existing) this.dialogue.refresh(existing);
         if (subPrevTool !== sub.currentTool || subPrevDetail !== sub.currentToolDetail) {
           this.npcManager.showActivityBubble(existing);
         }
@@ -477,8 +390,8 @@ export class MapScene extends Phaser.Scene {
       for (const s of students.values()) this.npcManager.destroy(s);
       this.studentNpcs.delete(sessionId);
     }
-    if (this.dialogueOpenFor && this.dialogueOpenFor.def.id === sessionId) {
-      this.closeDialogue();
+    if (this.dialogue.openNpc && this.dialogue.openNpc.def.id === sessionId) {
+      this.dialogue.close();
     }
   }
 
@@ -537,224 +450,14 @@ export class MapScene extends Phaser.Scene {
   }
 
   update(): void {
-    // Movement: keyboard wins over autopilot. Pressing any arrow cancels
-    // the auto-walk so the user always stays in control.
-    const speed = PLAYER_SPEED;
-    let vx = 0;
-    let vy = 0;
-    const anyArrow =
-      this.cursors.left.isDown ||
-      this.cursors.right.isDown ||
-      this.cursors.up.isDown ||
-      this.cursors.down.isDown;
-    if (anyArrow && this.playerAutoWalk) this.playerAutoWalk = undefined;
+    this.playerController.update();
 
-    if (this.playerAutoWalk) {
-      const walk = this.playerAutoWalk;
-      const wp = walk.waypoints[0];
-      if (!wp) {
-        this.playerAutoWalk = undefined;
-      } else {
-        const dx = wp.x - this.player.x;
-        const dy = wp.y - this.player.y;
-        const dist = Math.hypot(dx, dy);
-
-        if (dist < 14) {
-          walk.waypoints.shift();
-          if (walk.waypoints.length === 0) {
-            // Arrived at the agent: stop and open the dialogue.
-            const targetId = walk.targetId;
-            this.playerAutoWalk = undefined;
-            const target =
-              this.teacherNpcs.get(targetId) ?? this.findStudentNpc(targetId);
-            if (target) {
-              this.nearestNpc = target;
-              this.openDialogue(target);
-            }
-          }
-        } else {
-          const inv = 1 / dist;
-          vx = dx * inv * speed;
-          vy = dy * inv * speed;
-
-          // Stuck detection — if we stop making progress against a wall for
-          // ~1.2 s, give up and hand control back to the user.
-          const body = this.player.body as Phaser.Physics.Arcade.Body;
-          const blocked =
-            body.blocked.left || body.blocked.right || body.blocked.up || body.blocked.down;
-          if (blocked && Math.abs(walk.lastDist - dist) < 1) {
-            walk.stuckSince ??= this.time.now;
-            if (this.time.now - walk.stuckSince > 1200) {
-              this.playerAutoWalk = undefined;
-              vx = 0;
-              vy = 0;
-            }
-          } else {
-            walk.stuckSince = undefined;
-          }
-          walk.lastDist = dist;
-        }
-      }
-    } else {
-      if (this.cursors.left.isDown) vx = -speed;
-      else if (this.cursors.right.isDown) vx = speed;
-      if (this.cursors.up.isDown) vy = -speed;
-      else if (this.cursors.down.isDown) vy = speed;
-    }
-
-    if (vx !== 0 && vy !== 0) {
-      const inv = 1 / Math.SQRT2;
-      vx *= inv;
-      vy *= inv;
-    }
-
-    this.player.setVelocity(vx, vy);
-    this.player.setDepth(layerDepth.AGENTS + Math.round(this.player.y));
-
-    // Player animation: 4-direction (down/left/right/up).
-    const moving = vx !== 0 || vy !== 0;
-    if (moving) {
-      if (Math.abs(vx) >= Math.abs(vy) && vx !== 0) {
-        this.playerLastDir = vx < 0 ? "left" : "right";
-      } else if (vy !== 0) {
-        this.playerLastDir = vy < 0 ? "up" : "down";
-      }
-    }
-    this.player.play(`player_${moving ? "walk" : "idle"}_${this.playerLastDir}`, true);
-    this.player.setFlipX(
-      this.npcManager.needsRightFlip("player") && this.playerLastDir === "right"
-    );
-
-    // NPC AI + overlays via the manager (handles wander, badge/glyph/bubble follow).
+    // NPC AI + overlays via the manager.
     const now = this.time.now;
-    this.npcManager.updateAll(now, this.dialogueOpenFor);
+    this.npcManager.updateAll(now, this.dialogue.openNpc);
 
-    // Sub-agent despawn timer: a finished student lingers a short while in
-    // `done` so the user can see they completed, then fades out.
+    // Sub-agent despawn timer: finished students linger briefly then fade out.
     this.tickSubAgentDespawns(now);
-
-    // Interaction prompt
-    this.updateNearestNpc();
-    this.updateDialogueInput();
-  }
-
-  private updateNearestNpc(): void {
-    let best: NpcInstance | undefined;
-    let bestDist = INTERACTION_RADIUS;
-    for (const npc of this.npcManager.npcs) {
-      const dx = npc.sprite.x - this.player.x;
-      const dy = npc.sprite.y - this.player.y;
-      const d = Math.hypot(dx, dy);
-      if (d < bestDist) {
-        bestDist = d;
-        best = npc;
-      }
-    }
-
-    this.nearestNpc = best;
-    if (!this.promptText) return;
-
-    if (best && this.dialogueOpenFor !== best) {
-      this.promptText.setText(`[E] parler à ${best.def.name}`);
-      this.promptText.setPosition(best.sprite.x, best.sprite.y - PLAYER_H);
-      this.promptText.setDepth(layerDepth.OVERLAYS + Math.round(best.sprite.y));
-      this.promptText.setVisible(true);
-    } else {
-      this.promptText.setVisible(false);
-    }
-
-    // Close any open dialogue when we walk out of range.
-    if (this.dialogueOpenFor && this.dialogueOpenFor !== best) {
-      this.closeDialogue();
-    }
-  }
-
-  private updateDialogueInput(): void {
-    if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
-      if (this.dialogueOpenFor) {
-        this.closeDialogue();
-      } else if (this.nearestNpc) {
-        this.openDialogue(this.nearestNpc);
-      }
-    }
-  }
-
-  private openDialogue(npc: NpcInstance): void {
-    this.closeDialogue();
-
-    const padding = 10;
-    const maxWidth = 340;
-    const status = npc.def.status;
-    const statusLabel = status ? STATUS_LABEL[status] : "";
-    // Teachers: just "Status · Tool" (project name is already on the house
-    // banner above). Students: their description if any, status as fallback.
-    let heading: string;
-    if (npc.def.role === "student") {
-      heading = npc.def.name && !npc.def.name.includes(" · sub")
-        ? npc.def.name
-        : [statusLabel, npc.def.currentTool].filter(Boolean).join("  ·  ");
-    } else {
-      heading = [statusLabel, npc.def.currentTool].filter(Boolean).join("  ·  ") || npc.def.name;
-    }
-    const line = npc.def.dialogue;
-
-    const nameText = this.add.text(0, 0, heading, {
-      fontSize: "13px",
-      fontStyle: "bold",
-      color: "#1a202c",
-    });
-    const bodyText = this.add.text(0, 18, line, {
-      fontSize: "12px",
-      color: "#1a202c",
-      wordWrap: { width: maxWidth },
-    });
-
-    const w = Math.max(nameText.width, bodyText.width) + padding * 2;
-    const h = nameText.height + bodyText.height + padding * 2 + 4;
-
-    const bg = this.add.graphics();
-    bg.fillStyle(0xffffff, 1);
-    bg.lineStyle(2, 0x1a202c, 1);
-    bg.fillRoundedRect(0, 0, w, h, 8);
-    bg.strokeRoundedRect(0, 0, w, h, 8);
-    // tail
-    const tailX = w / 2;
-    bg.fillTriangle(tailX - 8, h, tailX + 8, h, tailX, h + 10);
-    bg.lineBetween(tailX - 8, h, tailX, h + 10);
-    bg.lineBetween(tailX, h + 10, tailX + 8, h);
-
-    nameText.setPosition(padding, padding);
-    bodyText.setPosition(padding, padding + nameText.height + 4);
-
-    const container = this.add.container(0, 0, [bg, nameText, bodyText]);
-    container.setSize(w, h);
-    container.setDepth(layerDepth.OVERLAYS + 10000);
-    // Anchor: bottom-center of bubble above the NPC.
-    const bx = Phaser.Math.Clamp(npc.sprite.x - w / 2, 8, GRID.width - w - 8);
-    const by = npc.sprite.y - PLAYER_H - h - 12;
-    container.setPosition(bx, Math.max(8, by));
-
-    this.dialogueGroup = container;
-    this.dialogueOpenFor = npc;
-    if (this.promptText) this.promptText.setVisible(false);
-  }
-
-  private closeDialogue(): void {
-    this.dialogueGroup?.destroy();
-    this.dialogueGroup = undefined;
-    this.dialogueOpenFor = undefined;
-  }
-
-  private refreshDialogue(npc: NpcInstance): void {
-    // Cheap update: re-open the dialogue with the latest dialogue line.
-    if (this.dialogueOpenFor !== npc) return;
-    this.openDialogue(npc);
-  }
-
-  private formatRole(role?: string): string {
-    if (!role) return "";
-    // Title-case the JSON role ("teacher" → "Teacher").
-    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
   }
 
   /**
