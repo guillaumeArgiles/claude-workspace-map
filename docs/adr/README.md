@@ -14,7 +14,7 @@ Format inspiré de [Michael Nygard's template](https://github.com/joelparkerhend
 
 | ID | Titre | Statut | Date |
 |---|---|---|---|
-| _0001_ | _PTY wrap pour l'interaction agent_ | _à venir (story S1.5)_ | _-_ |
+| [0001](0001-pty-wrap-for-agent-interaction.md) | PTY wrap pour l'interaction agent | Accepted | 2026-05-24 |
 
 ## Template
 
