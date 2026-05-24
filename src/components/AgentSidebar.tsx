@@ -66,6 +66,17 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     () => (typeof Notification !== "undefined" ? Notification.permission : "denied")
   );
+  // Re-sync on mount (in case the lazy initializer ran before the API was
+  // fully available) and whenever the tab regains focus (user may have changed
+  // permissions in browser settings while away).
+  useEffect(() => {
+    const sync = () => {
+      if ("Notification" in window) setNotifPermission(Notification.permission);
+    };
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => document.removeEventListener("visibilitychange", sync);
+  }, []);
   /** Kept fresh each render so the notification onclick can open the right terminal. */
   const agentClickRef = useRef<(a: AgentState) => void>(() => {});
   /** Kept fresh for the uiBus open_terminal handler (stable closure via ref). */
