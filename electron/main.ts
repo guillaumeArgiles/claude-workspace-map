@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import net from "node:net";
 // electron-updater is CJS — must use default import in ESM context
 import electronUpdater from "electron-updater";
 const { autoUpdater } = electronUpdater;
@@ -20,6 +21,23 @@ const RENDERER_DIST = path.join(__dirname, "../../dist");
 
 /** Port used in production (set before createWindow so loadURL can reference it). */
 let prodPort = 4000;
+
+/** Returns the preferred port if free, otherwise a random available port. */
+function findFreePort(preferred: number): Promise<number> {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.listen(preferred, () => {
+      probe.close(() => resolve(preferred));
+    });
+    probe.on("error", () => {
+      const fallback = net.createServer();
+      fallback.listen(0, () => {
+        const { port } = fallback.address() as net.AddressInfo;
+        fallback.close(() => resolve(port));
+      });
+    });
+  });
+}
 
 let stopServer: (() => Promise<void>) | undefined;
 
@@ -119,7 +137,8 @@ function createWindow(): BrowserWindow {
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-  prodPort = Number(process.env["PORT"] ?? 4000);
+  const preferredPort = Number(process.env["PORT"] ?? 4000);
+  prodPort = VITE_DEV_SERVER_URL ? preferredPort : await findFreePort(preferredPort);
 
   try {
     // In prod, pass RENDERER_DIST so the server also serves the renderer's
@@ -127,9 +146,14 @@ app.whenReady().then(async () => {
     const staticRoot = VITE_DEV_SERVER_URL ? undefined : RENDERER_DIST;
     stopServer = await startServer(prodPort, staticRoot);
   } catch (err) {
-    // In dev, the standalone `npm run server` might already be running on
-    // this port. Log and continue — the window will proxy to it.
+    // Should not happen in prod (findFreePort guarantees availability), but
+    // guard anyway. In dev, the Vite dev server is the renderer — log and go.
     console.error("[electron] Failed to start embedded server:", err);
+    if (!VITE_DEV_SERVER_URL) {
+      await dialog.showErrorBox("Startup error", `Server failed to start: ${err}`);
+      app.quit();
+      return;
+    }
   }
 
   createWindow();

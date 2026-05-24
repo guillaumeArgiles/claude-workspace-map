@@ -282,7 +282,7 @@ export class NpcManager {
       return;
     }
 
-    // Pinned statuses: the agent stands still.
+    // Pinned statuses: the agent stands still, with per-status animation.
     const status = npc.def.status ?? "idle";
     if (
       status === "blocked" ||
@@ -295,8 +295,31 @@ export class NpcManager {
     ) {
       npc.sprite.setVelocity(0, 0);
       playIdle();
+
+      // Capture the rest Y on the first frame of this status
+      if (npc.lastAnimStatus !== status) {
+        npc.animBaseY = npc.sprite.y;
+        npc.lastAnimStatus = status;
+      }
+      const baseY = npc.animBaseY!;
+
+      if (status === "awaiting_approval") {
+        // Bounce marqué : ±6px, période ~350ms
+        npc.sprite.setY(baseY + Math.sin(now / 350) * 6);
+      } else if (status === "blocked") {
+        // Oscillation lente : ±3px, période ~900ms
+        npc.sprite.setY(baseY + Math.sin(now / 900) * 3);
+      } else if (status === "coding" || status === "running_tool") {
+        // Micro-vibration rapide : ±1.5px, période ~55ms
+        npc.sprite.setY(baseY + Math.sin(now / 55) * 1.5);
+      }
+
       return;
     }
+
+    // Leaving a pinned status — clear animation context
+    npc.animBaseY = undefined;
+    npc.lastAnimStatus = undefined;
 
     if (npc.state === "idle") {
       if (now >= npc.nextStateAt) {
@@ -388,11 +411,9 @@ export class NpcManager {
   private repositionGlyph(npc: NpcInstance): void {
     if (!npc.statusGlyph) return;
     const sprite = npc.sprite;
-    const isAwaiting = npc.def.status === "awaiting_approval";
-    const bob = Math.sin(this.scene.time.now / (isAwaiting ? 350 : 280)) * (isAwaiting ? 7 : 3);
     npc.statusGlyph.setPosition(
       sprite.x,
-      sprite.y - sprite.displayHeight * 0.5 - 22 + bob
+      sprite.y - sprite.displayHeight * 0.5 - 22
     );
     npc.statusGlyph.setDepth(sprite.depth + 3);
   }

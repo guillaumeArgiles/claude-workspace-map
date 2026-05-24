@@ -55,4 +55,8 @@ export interface NpcInstance {
   statusGlyph?: Phaser.GameObjects.Container;
   /** When set, the sub-agent should be despawned at this time (post-done linger). */
   despawnAt?: number;
+  /** Y de repos pour les animations de statut (reset à chaque changement de statut). */
+  animBaseY?: number;
+  /** Dernier statut vu par l'animation loop, pour détecter les transitions. */
+  lastAnimStatus?: string;
 }

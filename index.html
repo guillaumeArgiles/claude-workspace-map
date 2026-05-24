@@ -149,6 +149,18 @@
       #agent-sidebar .clear-btn-header:hover { opacity: 1; background: #1e2430; }
       #agent-sidebar .professor-btn-header { background: #1e2d1e; border: 1px solid #3b6b3b; color: #86efac; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; transition: background 0.12s; }
       #agent-sidebar .professor-btn-header:hover { background: #264a26; border-color: #4ade80; }
+      /* ── C3 — Ambiance RPG ────────────────────────────────────────────── */
+      html, body { background: #0d1117; }
+      #game-mount { position: relative; }
+      #game-mount::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 48%, transparent 52%, rgba(0,0,0,0.55) 100%); pointer-events: none; z-index: 5; }
+      #agent-sidebar { border-left: 1px solid #1a2744; box-shadow: -8px 0 28px rgba(0,0,0,0.55); }
+      #agent-sidebar header { background: linear-gradient(160deg, #131c30 0%, #111418 100%); border-bottom: 1px solid #1a2744; }
+      #agent-sidebar .groups::-webkit-scrollbar { width: 3px; }
+      #agent-sidebar .groups::-webkit-scrollbar-track { background: transparent; }
+      #agent-sidebar .groups::-webkit-scrollbar-thumb { background: #2a3345; border-radius: 2px; }
+      #agent-sidebar .groups::-webkit-scrollbar-thumb:hover { background: #3d4f6a; }
+      #agent-sidebar .status-dot { transition: background-color 0.35s ease, box-shadow 0.35s ease; }
+      #agent-sidebar .agent-head:hover { background: #171d27; box-shadow: inset 2px 0 0 #6366f1; }
     </style>
   </head>
   <body>

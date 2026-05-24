@@ -428,7 +428,7 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
       <aside id="agent-sidebar">
         <header>
           <span className={`dot ${connected ? "ok" : "ko"}`} />
-          <h2>Live Claude sessions</h2>
+          <h2>Online</h2>
           <span className="count">
             {totalAgents}{totalSubs > 0 ? ` · ${totalSubs} sub` : ""}
           </span>
