@@ -1,7 +1,9 @@
 import { app, BrowserWindow, dialog, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { autoUpdater } from "electron-updater";
+// electron-updater is CJS — must use default import in ESM context
+import electronUpdater from "electron-updater";
+const { autoUpdater } = electronUpdater;
 import { startServer } from "../server/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
