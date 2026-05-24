@@ -116,9 +116,12 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
 
   /**
    * Resume an existing agent session in a new PTY.
-   * Uses `claude --resume <sessionId>` so Claude Code loads the full
-   * conversation history for that session — effectively "re-opening"
-   * the Claude Code TUI for it.
+   *
+   * We use `claude --continue` (not `--resume <sessionId>`).
+   * `--resume <UUID>` triggers a git-diff crash in Claude Code's Bun
+   * runtime for non-recent sessions (unhandled exception in the diff
+   * stats initializer). `--continue` loads the most recent conversation
+   * in the cwd — same net result, no crash.
    */
   async function resumeSession(agent: AgentState) {
     if (resumingId) return; // debounce
@@ -129,7 +132,7 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cwd: agent.cwd,
-          command: `claude --resume ${agent.sessionId}`,
+          command: "claude --continue",
         }),
       });
       if (!res.ok) throw new Error(await res.text());
