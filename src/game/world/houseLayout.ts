@@ -35,21 +35,21 @@ export interface HouseState {
  *   Monitoring gap x ≈ 1090 → 1160 → center 1125
  *
  * Center y values are chosen from NavGrid analysis (cellSize=24, margin=24):
- *   - house_claude interior is fully blocked by furniture → use entrance path (y≈480)
- *   - house_review interior is fully blocked → use entrance path (y≈480)
+ *   - house_claude: new_4 (desk) removed from collisions.json → interior walkable at y=260
+ *   - house_review: new_16+17 (tables) removed from collisions.json → interior walkable at y=280
  *   - house_monitoring has walkable interior cells → use interior (y=330)
  */
 export const HOUSES: House[] = [
   {
     id: "house_claude",
     building: "CLAUDE",
-    center: { x: 360, y: 480 },
+    center: { x: 290, y: 260 },
     entrance: { x: 295, y: 450 },
   },
   {
     id: "house_review",
     building: "REVIEW",
-    center: { x: 720, y: 480 },
+    center: { x: 720, y: 280 },
     entrance: { x: 697, y: 450 },
   },
   {
