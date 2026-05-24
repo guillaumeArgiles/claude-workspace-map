@@ -231,6 +231,10 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   /** Request browser notification permission and update state. */
   async function requestNotifPermission() {
     if (!("Notification" in window)) return;
+    if (Notification.permission === "denied") {
+      alert("Notifications bloquées par le navigateur.\nRéactive-les dans Préférences > Notifications.");
+      return;
+    }
     const perm = await Notification.requestPermission();
     setNotifPermission(perm);
   }
@@ -352,11 +356,16 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
           }
           break;
 
-        // B → request desktop notification permission
+        // B → request desktop notification permission (or warn if denied)
         case "b": case "B":
           if ("Notification" in window) {
             e.preventDefault();
-            void Notification.requestPermission().then((p) => setNotifPermission(p));
+            if (Notification.permission === "denied") {
+              // Browser blocked — user must re-enable in browser settings.
+              alert("Notifications bloquées par le navigateur.\nRéactive-les dans Préférences > Notifications.");
+            } else {
+              void Notification.requestPermission().then((p) => setNotifPermission(p));
+            }
           }
           break;
 

@@ -26,6 +26,12 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize, onRespawn }: 
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  // Always-current callbacks — the xterm key handler is set up once but needs
+  // to call the latest onClose/onMinimize props without a stale closure.
+  const onCloseRef = useRef(onClose);
+  const onMinimizeRef = useRef(onMinimize);
+  onCloseRef.current = onClose;
+  onMinimizeRef.current = onMinimize;
   const [connected, setConnected] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [crashed, setCrashed] = useState(false);
@@ -81,9 +87,15 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize, onRespawn }: 
     fitRef.current = fit;
 
     // ── Key event isolation ─────────────────────────────────────────────
+    // stopPropagation prevents Phaser / sidebar shortcuts from firing while
+    // the user types in the terminal. Escape is intercepted here (not sent
+    // to the PTY) and closes the overlay via the always-current ref.
     term.attachCustomKeyEventHandler((ev) => {
+      if (ev.key === "Escape") {
+        if (ev.type === "keydown") onCloseRef.current();
+        return false; // don't send ESC to the PTY
+      }
       ev.stopPropagation();
-      if (ev.key === "Escape" && ev.type === "keydown") return false;
       return true;
     });
 
@@ -152,10 +164,7 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize, onRespawn }: 
   }
 
   return (
-    <div
-      id="terminal-overlay"
-      onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onMinimize(); } }}
-    >
+    <div id="terminal-overlay">
       <div id="terminal-panel">
         <header id="terminal-header">
           <span className="term-title" title={cwd}>{shortName(cwd)}</span>
