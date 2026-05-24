@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   AgentState,
   ServerEvent,
@@ -59,6 +59,15 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   const [recentCwds, setRecentCwds] = useState<string[]>(loadRecentCwds);
   /** sessionId being resumed right now (shows spinner in that row). */
   const [resumingId, setResumingId] = useState<string | null>(null);
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
+    () => (typeof Notification !== "undefined" ? Notification.permission : "denied")
+  );
+  /** Kept fresh each render so the notification onclick can open the right terminal. */
+  const agentClickRef = useRef<(a: AgentState) => void>(() => {});
+  /** Previous status per sessionId — lets us fire only on transitions. */
+  const prevStatusRef = useRef<Map<string, string>>(new Map());
 
   // ── SSE subscription ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -165,6 +174,60 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
       void resumeSession(agent);
     }
   }
+  // Keep the ref fresh so notification onclick always calls the current version.
+  agentClickRef.current = handleAgentClick;
+
+  // ── Notification helpers ──────────────────────────────────────────────────
+
+  /** Request browser notification permission and update state. */
+  async function requestNotifPermission() {
+    if (!("Notification" in window)) return;
+    const perm = await Notification.requestPermission();
+    setNotifPermission(perm);
+  }
+
+  /** Fire a desktop notification for an agent that needs attention. */
+  function showNotification(agent: AgentState) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    const isBlocked = agent.status === "blocked";
+    const title = isBlocked
+      ? `🚫 ${agent.projectName} est bloqué`
+      : `✋ ${agent.projectName} attend ta réponse`;
+    const body = agent.currentToolDetail
+      ?? (isBlocked ? "Besoin d'aide" : "En attente de validation");
+    // `tag` deduplicates: a second notification for the same session replaces
+    // the first instead of stacking.
+    const n = new Notification(title, { body, tag: agent.sessionId });
+    n.onclick = () => {
+      window.focus();
+      agentClickRef.current(agent);
+      n.close();
+    };
+  }
+
+  // ── Transition watcher — fires notifications on status changes ────────────
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    for (const agent of agents) {
+      const prevStatus = prev.get(agent.sessionId);
+      const newStatus = agent.status;
+      // prevStatus === undefined means first snapshot — skip to avoid
+      // notifying about agents that were already blocked before the page loaded.
+      if (
+        prevStatus !== undefined &&
+        prevStatus !== newStatus &&
+        (newStatus === "awaiting_approval" || newStatus === "blocked")
+      ) {
+        showNotification(agent);
+      }
+      prev.set(agent.sessionId, newStatus);
+    }
+    // Remove stale entries for sessions that disappeared.
+    const ids = new Set(agents.map((a) => a.sessionId));
+    for (const id of prev.keys()) {
+      if (!ids.has(id)) prev.delete(id);
+    }
+  }, [agents]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Grouping ──────────────────────────────────────────────────────────────
   const groups = useMemo(() => {
@@ -222,6 +285,21 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
           >
             ⚡
           </button>
+          {"Notification" in window && (
+            <button
+              className={`notif-btn ${notifPermission === "granted" ? "active" : ""}`}
+              onClick={notifPermission !== "granted" ? requestNotifPermission : undefined}
+              title={
+                notifPermission === "granted"
+                  ? "Notifications activées"
+                  : notifPermission === "denied"
+                  ? "Notifications bloquées — réactiver dans les préférences du navigateur"
+                  : "Activer les notifications desktop"
+              }
+            >
+              🔔
+            </button>
+          )}
           <button className="collapse-btn" onClick={onToggle} title="Collapse">→</button>
         </header>
 
@@ -321,7 +399,10 @@ function AgentRow({
         <span className="icon teacher" style={spriteStyle(teacherSpriteFor(agent.sessionId))} />
         <div className="meta">
           <div className="line">
-            <span className="status-dot" style={{ background: STATUS_COLOR[agent.status] }} />
+            <span
+              className={`status-dot${agent.status === "awaiting_approval" || agent.status === "blocked" ? " status-dot-pulse" : ""}`}
+              style={{ background: STATUS_COLOR[agent.status] }}
+            />
             <span className="status">{STATUS_LABEL[agent.status]}</span>
             {agent.currentTool ? <span className="tool"> · {agent.currentTool}</span> : null}
           </div>

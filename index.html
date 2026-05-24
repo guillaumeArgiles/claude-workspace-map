@@ -116,6 +116,14 @@
       .crash-detail { opacity: 0.65; font-family: ui-monospace, monospace; font-size: 10.5px; }
       .crash-respawn-btn { background: #1e2d3d; border: 1px solid #3b5a80; color: #7dd3fc; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
       .crash-respawn-btn:hover { background: #264a68; border-color: #60a5fa; }
+      /* ── Notifications ────────────────────────────────────────────────────── */
+      .notif-btn { background: transparent; border: none; font-size: 14px; padding: 0 4px; cursor: pointer; opacity: 0.35; transition: opacity 0.15s; border-radius: 4px; }
+      .notif-btn:hover { opacity: 0.7; }
+      .notif-btn.active { opacity: 1; }
+      .notif-btn[title*="bloquées"] { cursor: not-allowed; }
+      /* Pulsing status dot for awaiting_approval / blocked */
+      @keyframes dot-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(1.35); } }
+      .status-dot-pulse { animation: dot-pulse 1.5s ease-in-out infinite; }
     </style>
   </head>
   <body>
