@@ -74,6 +74,11 @@ export class PlayerController {
     this.interactKey = this.scene.input.keyboard!.addKey(
       Phaser.Input.Keyboard.KeyCodes.E
     );
+    // Allow DOM inputs (chat, sidebar) to receive key events without Phaser
+    // calling preventDefault() on them. Phaser's internal key state tracking
+    // continues to work normally — player movement and E-key interactions are
+    // unaffected.
+    this.scene.input.keyboard!.disableGlobalCapture();
 
     return sprite;
   }
