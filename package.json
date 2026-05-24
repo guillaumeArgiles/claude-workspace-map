@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "RPG command center for orchestrating Claude Code sessions",
-  "author": "Guillaume Argiles <>>",
+  "author": "Guillaume Argiles",
   "type": "module",
   "main": "dist-electron/main/index.js",
   "scripts": {

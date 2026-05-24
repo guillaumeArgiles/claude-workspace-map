@@ -2,7 +2,7 @@
 
 Backlog produit pour la roadmap **12 mois → exit Anthropic**.
 
-Référence : [Plan complet](../../..>(plan local, non versionné)) (chez l'utilisateur, pas dans le repo).
+Référence : Plan complet disponible localement (non versionné).
 
 Conventions :
 - `S<phase>.<num>` = story du sprint (ex: `S1.1`)
@@ -130,7 +130,7 @@ But : démontrer une willingness to pay.
 - [ ] **S12.1** Outreach LinkedIn/Twitter aux 200 DAU actifs (interviews, témoignages)
 - [ ] **S12.2** Articles invités (Console.dev, Bytes.dev, dev.to)
 - [ ] **S12.3** Conférences locales si timing OK
-- [ ] **S12.4** **Premiers contacts DevRel Anthropic** (Alex Albert) — pitch produit, feedback, pas encore "à vendre"
+- [ ] **S12.4** **Premiers contacts DevRel Anthropic** — pitch produit, feedback, pas encore "à vendre"
 
 **Métrique de fin de phase** : 5 équipes payantes (50 user accounts), 500 DAU.
 
