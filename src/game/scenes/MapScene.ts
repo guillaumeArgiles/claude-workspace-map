@@ -74,6 +74,7 @@ export class MapScene extends Phaser.Scene {
     // Player + all teacher/student sprite candidates. Loaded as plain images;
     // sliced into 3×4 RPG Maker sheets in create(). Missing files are tolerated.
     this.load.image("player_image", "/assets/sprites/player.png");
+    this.load.image("profesor_image", "/assets/sprites/profesor.png");
     for (const src of [...TEACHER_SPRITES, ...STUDENT_SPRITES]) {
       this.load.image(`${src}_image`, `/assets/sprites/${src}.png`);
     }
@@ -162,7 +163,7 @@ export class MapScene extends Phaser.Scene {
       x: GRID.width / 2,
       y: GRID.height - 250,
       dialogue: "Comment puis-je t'aider ?",
-      sprite: "player", // réutilise le sprite du joueur en attendant un sprite dédié
+      sprite: "profesor",
       static: true,
     });
 
