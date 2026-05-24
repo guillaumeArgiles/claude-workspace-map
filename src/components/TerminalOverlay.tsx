@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "@xterm/xterm/css/xterm.css";
 
 interface TerminalOverlayProps {
   ptyId: string;
@@ -6,96 +9,111 @@ interface TerminalOverlayProps {
   onClose: () => void;
 }
 
-// Strip the most common ANSI/VT100 escape sequences so raw PTY output is
-// readable in the overlay without a full terminal emulator.
-function stripAnsi(s: string): string {
-  return (
-    s
-      // CSI sequences: ESC [ ... final-byte
-      .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
-      // OSC sequences: ESC ] ... ST
-      .replace(/\x1b\][^]*?(?:\x07|\x1b\\)/g, "")
-      // Other ESC sequences (2-char)
-      .replace(/\x1b[^[]/g, "")
-      // Normalize carriage returns
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-  );
-}
-
-const MAX_OUTPUT = 60_000; // ~60 KB
-
 export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
-  const [output, setOutput] = useState("");
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
   const [connected, setConnected] = useState(false);
-  const outputRef = useRef<HTMLPreElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Connect to SSE output stream for this PTY session.
   useEffect(() => {
-    setOutput("");
-    setConnected(false);
+    const container = containerRef.current;
+    if (!container) return;
 
+    // ── Create terminal ─────────────────────────────────────────────────
+    const term = new Terminal({
+      theme: {
+        background: "#0d1117",
+        foreground: "#d4d4d4",
+        cursor: "#6366f1",
+        cursorAccent: "#0d1117",
+        selectionBackground: "rgba(99, 102, 241, 0.3)",
+        black: "#1e1e2e",
+        red: "#f38ba8",
+        green: "#a6e3a1",
+        yellow: "#f9e2af",
+        blue: "#89b4fa",
+        magenta: "#cba6f7",
+        cyan: "#89dceb",
+        white: "#cdd6f4",
+        brightBlack: "#585b70",
+        brightRed: "#f38ba8",
+        brightGreen: "#a6e3a1",
+        brightYellow: "#f9e2af",
+        brightBlue: "#89b4fa",
+        brightMagenta: "#cba6f7",
+        brightCyan: "#89dceb",
+        brightWhite: "#cdd6f4",
+      },
+      fontFamily: "ui-monospace, 'Cascadia Code', 'Fira Code', 'Menlo', monospace",
+      fontSize: 12,
+      lineHeight: 1.4,
+      scrollback: 5000,
+      cursorBlink: true,
+      cursorStyle: "bar",
+      convertEol: false, // raw pass-through, PTY handles EOL
+      allowProposedApi: false,
+    });
+
+    const fit = new FitAddon();
+    term.loadAddon(fit);
+    term.open(container);
+    fit.fit();
+
+    termRef.current = term;
+    fitRef.current = fit;
+
+    // ── Send initial dimensions to PTY ──────────────────────────────────
+    const syncSize = () => {
+      fit.fit();
+      const { cols, rows } = term;
+      fetch(`/api/sessions/${ptyId}/resize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cols, rows }),
+      }).catch(() => {});
+    };
+    syncSize();
+
+    // ── Connect to PTY output stream ────────────────────────────────────
     const es = new EventSource(`/api/sessions/${ptyId}/output`);
-
+    setConnected(false);
     es.onopen = () => setConnected(true);
     es.onerror = () => setConnected(false);
     es.onmessage = (e) => {
       try {
         const { chunk } = JSON.parse(e.data) as { chunk: string };
-        setOutput((prev) => {
-          const next = prev + chunk;
-          return next.length > MAX_OUTPUT ? next.slice(-MAX_OUTPUT) : next;
-        });
+        term.write(chunk);
       } catch {
         /* ignore malformed frames */
       }
     };
 
-    return () => es.close();
-  }, [ptyId]);
-
-  // Auto-scroll to bottom whenever output grows.
-  useEffect(() => {
-    const el = outputRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [output]);
-
-  // Focus input after mount.
-  useEffect(() => inputRef.current?.focus(), []);
-
-  async function sendText(text: string) {
-    if (!text) return;
-    setSending(true);
-    try {
-      await fetch(`/api/sessions/${ptyId}/write`, {
+    // ── Forward keyboard input to PTY ───────────────────────────────────
+    // xterm onData fires for every key sequence including arrows, Ctrl+C,
+    // UTF-8 chars, paste — exactly what the PTY expects, no processing needed.
+    term.onData((data) => {
+      fetch(`/api/sessions/${ptyId}/write`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-    } finally {
-      setSending(false);
-    }
-  }
+        body: JSON.stringify({ text: data }),
+      }).catch(() => {});
+    });
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      const text = input;
-      setInput("");
-      sendText(text);
-    } else if (e.key === "Escape") {
-      onClose();
-    } else if (e.key === "c" && e.ctrlKey) {
-      // Ctrl+C — interrupt
-      e.preventDefault();
-      sendText("\x03");
-    }
-  }
+    // ── Resize observer — keep PTY in sync with container ───────────────
+    const resizeObserver = new ResizeObserver(() => syncSize());
+    resizeObserver.observe(container);
 
-  const cleanOutput = stripAnsi(output);
+    // Focus so keystrokes reach xterm immediately
+    term.focus();
+
+    return () => {
+      es.close();
+      resizeObserver.disconnect();
+      term.dispose();
+      termRef.current = null;
+      fitRef.current = null;
+    };
+  }, [ptyId]);
 
   return (
     <div id="terminal-overlay">
@@ -104,38 +122,18 @@ export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
           <span className="term-title" title={cwd}>
             {shortName(cwd)}
           </span>
-          <span className={`dot ${connected ? "ok" : "ko"}`} title={connected ? "connected" : "disconnected"} />
+          <span
+            className={`dot ${connected ? "ok" : "ko"}`}
+            title={connected ? "connected" : "disconnected"}
+          />
           <span className="term-pty-id">{ptyId.slice(0, 8)}</span>
-          <button className="close-btn" onClick={onClose} title="Close terminal">
+          <button className="close-btn" onClick={onClose} title="Close terminal (Esc)">
             ✕
           </button>
         </header>
 
-        <pre ref={outputRef} id="terminal-output">
-          {cleanOutput || <span className="term-empty">Waiting for output…</span>}
-        </pre>
-
-        <div id="terminal-input-row">
-          <span className="term-prompt">›</span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Send a message… (Enter to send, Ctrl+C to interrupt)"
-            disabled={sending}
-            spellCheck={false}
-            autoComplete="off"
-          />
-          <button
-            className="term-send-btn"
-            onClick={() => { const t = input; setInput(""); sendText(t); }}
-            disabled={!input.trim() || sending}
-          >
-            Send
-          </button>
-        </div>
+        {/* xterm.js mounts here — it creates its own canvas */}
+        <div ref={containerRef} id="terminal-xterm" />
       </div>
     </div>
   );

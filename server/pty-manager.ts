@@ -114,19 +114,35 @@ export class PtyManager {
   }
 
   /**
-   * Send raw text to a PTY (e.g., a user reply to a prompt).
-   * Appends \r if the text doesn't end with a newline.
+   * Send raw data to a PTY.
+   * Passes bytes through as-is — callers (xterm.js onData) already include
+   * the correct terminal sequences (\r for Enter, \x03 for Ctrl+C, etc.).
    */
   write(ptyId: string, text: string): boolean {
     const s = this.sessions.get(ptyId) as (PtySession & { _pty?: nodePty.IPty }) | undefined;
     if (!s?._pty) return false;
-    s._pty.write(text.endsWith("\r") || text.endsWith("\n") ? text : text + "\r");
+    s._pty.write(text);
     return true;
   }
 
   /** Send a single key / escape sequence to a PTY. */
   sendKey(ptyId: string, key: string): boolean {
     return this.write(ptyId, key);
+  }
+
+  /**
+   * Resize a PTY to match the xterm.js terminal dimensions.
+   * Must be called after FitAddon.fit() to keep PTY and UI in sync.
+   */
+  resize(ptyId: string, cols: number, rows: number): boolean {
+    const s = this.sessions.get(ptyId) as (PtySession & { _pty?: nodePty.IPty }) | undefined;
+    if (!s?._pty) return false;
+    try {
+      s._pty.resize(Math.max(1, cols), Math.max(1, rows));
+    } catch {
+      /* ignore resize errors on exited PTYs */
+    }
+    return true;
   }
 
   /** Kill the underlying process. */

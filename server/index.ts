@@ -171,6 +171,24 @@ export async function startServer(
       return;
     }
 
+    // POST /api/sessions/:ptyId/resize — sync PTY dimensions with xterm.js FitAddon
+    const resizeMatch = url.match(/^\/api\/sessions\/([^/]+)\/resize$/);
+    if (req.method === "POST" && resizeMatch) {
+      const ptyId = resizeMatch[1];
+      let body = "";
+      try {
+        for await (const chunk of req) body += chunk;
+        const { cols, rows } = JSON.parse(body) as { cols: number; rows: number };
+        const ok = ptyManager.resize(ptyId, cols, rows);
+        res.writeHead(ok ? 200 : 404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok }));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+      return;
+    }
+
     // GET /api/sessions — list active PTY sessions
     if (req.method === "GET" && url === "/api/sessions") {
       const list = ptyManager.list().map(({ id, cwd, pid, sessionId, createdAt, exitCode }) => ({
