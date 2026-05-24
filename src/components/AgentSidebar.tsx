@@ -67,6 +67,8 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   const [chatDraft, setChatDraft] = useState("");
   /** sessionId currently being sent (shows spinner). */
   const [chatSendingId, setChatSendingId] = useState<string | null>(null);
+  /** sessionId waiting for first response chunk after a send. */
+  const [chatAwaitingId, setChatAwaitingId] = useState<string | null>(null);
   /** Accumulated ANSI-stripped PTY output per sessionId. */
   const [chatOutputs, setChatOutputs] = useState<Map<string, string>>(new Map());
   /** Active PTY output SSE connections (keyed by sessionId). */
@@ -211,6 +213,8 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
         const { chunk } = JSON.parse(e.data) as { chunk: string };
         const text = stripAnsi(chunk);
         if (!text) return;
+        // Clear "thinking" indicator on first meaningful output.
+        setChatAwaitingId((prev) => (prev === sessionId ? null : prev));
         setChatOutputs((prev) => {
           const next = new Map(prev);
           const existing = next.get(sessionId) ?? "";
@@ -276,6 +280,8 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
       // Ensure output subscription is active (in case toggleChat's async call
       // hasn't resolved yet).
       startOutputSub(agent.sessionId, ptyId);
+      // Show "thinking" indicator until first response chunk arrives.
+      setChatAwaitingId(agent.sessionId);
 
       await fetch(`/api/sessions/${ptyId}/write`, {
         method: "POST",
@@ -296,6 +302,7 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
     if (chatOpenId === sessionId) {
       setChatOpenId(null);
       setChatDraft("");
+      setChatAwaitingId(null);
       stopOutputSub(sessionId);
     } else {
       setChatOpenId(sessionId);
@@ -392,6 +399,7 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
                         chatOpen={chatOpenId === a.sessionId}
                         chatDraft={chatOpenId === a.sessionId ? chatDraft : ""}
                         chatSending={chatSendingId === a.sessionId}
+                        chatAwaiting={chatAwaitingId === a.sessionId}
                         chatOutput={chatOutputs.get(a.sessionId) ?? ""}
                         onClick={() => handleAgentClick(a)}
                         onChatToggle={() => toggleChat(a.sessionId, a)}
@@ -445,6 +453,7 @@ function AgentRow({
   chatOpen,
   chatDraft,
   chatSending,
+  chatAwaiting,
   chatOutput,
   onClick,
   onChatToggle,
@@ -457,6 +466,7 @@ function AgentRow({
   chatOpen: boolean;
   chatDraft: string;
   chatSending: boolean;
+  chatAwaiting: boolean;
   chatOutput: string;
   onClick: () => void;
   onChatToggle: () => void;
@@ -539,9 +549,11 @@ function AgentRow({
       {chatOpen && (
         <div className="chat-panel">
           {/* PTY output area */}
-          {chatOutput && (
+          {chatOutput ? (
             <pre ref={outputRef} className="chat-output">{chatOutput}</pre>
-          )}
+          ) : chatAwaiting ? (
+            <div className="chat-thinking">Claude réfléchit…</div>
+          ) : null}
           {/* Input row */}
           <div className="chat-input-row">
             <input

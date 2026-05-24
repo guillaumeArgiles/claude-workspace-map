@@ -129,6 +129,8 @@
       .chat-panel { display: flex; flex-direction: column; }
       /* PTY output area */
       .chat-output { margin: 0; max-height: 220px; overflow-y: auto; background: #060b12; color: #8b949e; font-size: 10px; line-height: 1.45; padding: 6px 10px; border-top: 1px solid #1c2128; white-space: pre-wrap; word-break: break-all; font-family: 'Menlo', 'Monaco', 'Consolas', monospace; }
+      @keyframes thinking-pulse { 0%,100% { opacity: 0.35; } 50% { opacity: 1; } }
+      .chat-thinking { padding: 6px 10px; font-size: 11px; color: #6366f1; border-top: 1px solid #1c2128; animation: thinking-pulse 1.4s ease-in-out infinite; }
       /* Input row */
       .chat-input-row { display: flex; align-items: center; gap: 6px; padding: 6px 10px 4px; }
       .chat-input { flex: 1; background: #0d1117; border: 1px solid #2c313a; color: #eee; padding: 5px 8px; border-radius: 4px; font-size: 12px; font-family: system-ui, sans-serif; outline: none; min-width: 0; }
