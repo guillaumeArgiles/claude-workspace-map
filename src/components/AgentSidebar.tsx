@@ -90,6 +90,22 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   }, []);
 
   // ── PTY session management ────────────────────────────────────────────────
+  /** Spawn a brand-new Claude session (no --continue / --resume) in cwd. */
+  async function spawnFresh(cwd: string) {
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { ptyId } = (await res.json()) as { ptyId: string };
+      handleSpawned({ ptyId, cwd, spawnedAt: Date.now() });
+    } catch (err) {
+      console.error("Failed to spawn fresh session:", err);
+    }
+  }
+
   function handleSpawned(session: { ptyId: string; cwd: string; spawnedAt: number }) {
     setRecentCwds((prev) => {
       const next = [session.cwd, ...prev.filter((c) => c !== session.cwd)].slice(0, 10);
@@ -272,6 +288,7 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
           cwd={p.cwd}
           onMinimize={() => minimizeTerminal(p.ptyId)}
           onClose={() => closeTerminal(p.ptyId)}
+          onRespawn={(cwd) => { closeTerminal(p.ptyId); void spawnFresh(cwd); }}
         />
       ));
   }

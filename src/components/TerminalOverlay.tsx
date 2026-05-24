@@ -8,17 +8,34 @@ interface TerminalOverlayProps {
   cwd: string;
   onClose: () => void;
   onMinimize: () => void;
+  /** Called when the user asks to reopen the same cwd as a fresh session. */
+  onRespawn?: (cwd: string) => void;
 }
 
-export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize }: TerminalOverlayProps) {
+/**
+ * Detect the Claude Code v2.1.x crash that occurs when resuming a session
+ * whose history contains a Write/Create tool result (originalFile = null).
+ * Claude Code tries to call originalFile.split('\n') → TypeError.
+ * Signature: Bun's /$bunfs/ path appears in the output.
+ */
+function isCrashOutput(chunk: string): boolean {
+  return chunk.includes("/$bunfs/root/") || chunk.includes("null is not an object");
+}
+
+export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize, onRespawn }: TerminalOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const [connected, setConnected] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const [crashed, setCrashed] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    setSessionEnded(false);
+    setCrashed(false);
 
     // ── Create terminal ─────────────────────────────────────────────────
     const term = new Terminal({
@@ -64,11 +81,6 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize }: TerminalOve
     fitRef.current = fit;
 
     // ── Key event isolation ─────────────────────────────────────────────
-    // Phaser's KeyboardPlugin listens at window-level and calls
-    // preventDefault() on captured keys (space, arrows…). xterm.js checks
-    // event.defaultPrevented before processing — those keys silently vanish.
-    // Fix: stop propagation inside xterm's own handler so Phaser never sees it.
-    // Escape is let through (return false) so the overlay div can minimize.
     term.attachCustomKeyEventHandler((ev) => {
       ev.stopPropagation();
       if (ev.key === "Escape" && ev.type === "keydown") return false;
@@ -96,6 +108,10 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize }: TerminalOve
       try {
         const { chunk } = JSON.parse(e.data) as { chunk: string };
         term.write(chunk);
+        // Detect Claude Code crash (bug in v2.1.x: originalFile null on resume)
+        if (isCrashOutput(chunk)) setCrashed(true);
+        // Detect process exit sentinel written by pty-manager
+        if (chunk.includes("[session ended]")) setSessionEnded(true);
       } catch { /* ignore */ }
     };
 
@@ -123,8 +139,12 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize }: TerminalOve
     };
   }, [ptyId]);
 
+  function handleRespawn() {
+    onClose();
+    onRespawn?.(cwd);
+  }
+
   return (
-    // Escape minimizes (xterm lets it through via attachCustomKeyEventHandler)
     <div
       id="terminal-overlay"
       onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onMinimize(); } }}
@@ -132,14 +152,40 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize }: TerminalOve
       <div id="terminal-panel">
         <header id="terminal-header">
           <span className="term-title" title={cwd}>{shortName(cwd)}</span>
-          <span className={`dot ${connected ? "ok" : "ko"}`} title={connected ? "connected" : "disconnected"} />
+          <span className={`dot ${connected && !sessionEnded ? "ok" : "ko"}`} title={connected ? "connected" : "disconnected"} />
           <span className="term-pty-id">{ptyId.slice(0, 8)}</span>
           <div className="term-controls">
             <button className="term-btn minimize-btn" onClick={onMinimize} title="Minimize — attach to agent">—</button>
             <button className="term-btn close-btn" onClick={onClose} title="Close terminal">✕</button>
           </div>
         </header>
+
         <div ref={containerRef} id="terminal-xterm" />
+
+        {/* Recovery banner — shown when Claude Code crashes loading session history */}
+        {sessionEnded && crashed && onRespawn && (
+          <div id="terminal-crash-bar">
+            <span className="crash-msg">
+              ⚠ Claude Code crashed loading session history
+              <span className="crash-detail"> (bug v2.1.x — originalFile null on resume)</span>
+            </span>
+            <button className="crash-respawn-btn" onClick={handleRespawn}>
+              ⚡ Open fresh session
+            </button>
+          </div>
+        )}
+
+        {/* Ended but NOT crashed — normal exit */}
+        {sessionEnded && !crashed && (
+          <div id="terminal-ended-bar">
+            <span>Session ended</span>
+            {onRespawn && (
+              <button className="crash-respawn-btn" onClick={handleRespawn}>
+                ⚡ New session
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
