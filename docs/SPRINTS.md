@@ -87,7 +87,7 @@ NpcManager reste épais à cause du sprite loader (buildCharacterAnimations + en
 
 ---
 
-## Sprint 2 — Types stricts + tests étendus + pathfinding (à démarrer)
+## Sprint 2 — Types stricts + tests étendus + pathfinding (livré)
 
 **Goal** : finir le hardening (validation runtime + tests + CI) ET attaquer le pain point n°1 du dogfooding user (pathfinding qui bloque).
 
@@ -96,12 +96,65 @@ NpcManager reste épais à cause du sprite loader (buildCharacterAnimations + en
 | S2.1 | Zod (ou typebox) pour valider chaque ligne JSONL | 1j | **livré** — `server/schemas.ts`, `parseLine` consomme `safeParse`, sink télémétrie injectable, 4 nouveaux tests |
 | S2.2 | Tests `server/watcher.ts` (add/change/unlink, byte offset, sub-agents) | 1j | **livré** — 17 specs, drives `handleAddOrChange` contre tmp dir, couvre split-line + sub-agent lifecycle complet |
 | S2.3 | Strict TS settings (`noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) | 0.5j | **livré** — étend la couverture tsc à `server/` + `shared/`, fixe 8 erreurs (pino default import, FSWatcher typing, handlers typés) |
-| S2.4 | CI GitHub Actions (tsc + vitest + lint sur PR) | 0.5j | Le repo n'est pas encore public, mais on le prépare |
+| S2.4 | CI GitHub Actions (tsc + vitest sur PR) | 0.5j | **livré** — `.github/workflows/ci.yml`, Node pinné via `.nvmrc`, lint reporté en PT.6 |
 | S2.5 | **A\* pathfinding grid-based** (player + NPCs) | 2j | **livré** — `NavGrid` 24px cells, 14 tests verts, intégré au PlayerController + NpcManager |
 
 Budget : 5j dev sur 10j calendaires. Marge confortable pour le dogfooding et les pivots.
 
-**Mes propositions de séquence** : S2.5 en premier (le pain user, débloque mentalement), puis S2.3 (filet TS), puis S2.1/S2.2 (Zod + tests watcher en duo), enfin S2.4 (CI).
+**Séquence retenue** : S2.5 (pain user, débloque mentalement) → S2.3 (filet TS) → S2.1 (Zod) → S2.2 (tests watcher) → S2.4 (CI).
+
+### État final
+
+| Quoi | Valeur |
+|---|---|
+| Stories livrées | 5/5 |
+| Commits | 4 (`62c4282`, `c47cbb6`, `eb8d8e8`, `91cd642`) + CI à committer |
+| Tests | 47 → **68** (+21) |
+| Fichiers tests créés | `NavGrid.test.ts`, `watcher.test.ts` |
+| tsc coverage étendue | `src/` → `src/` + `server/` + `shared/` |
+| Nouveau code | `NavGrid.ts`, `schemas.ts`, `ci.yml`, `.nvmrc` |
+
+### Retro
+
+**Ce qui a bien marché**
+- S2.5 en ouverture a tout de suite répondu au pain user : autopilot routé via A*, plus de scènes embarrassantes où le perso colle un mur. Le commit a été clean, 14 specs vertes du premier coup une fois le off-by-one de `markRectBlocked` réglé.
+- S2.3 a été un cadeau caché : en étendant la couverture tsc à `server/`+`shared/`, on a découvert 8 bugs latents (mauvais import pino, namespace chokidar obsolète, handlers `any`). Tous fixés sans test à écrire — TS a fait le travail.
+- S2.1 (Zod) a donné un bénéfice à terme : un sink télémétrie qui captera les drifts de format Claude Code AVANT qu'ils nous explosent à la figure. Le sink injectable plutôt qu'un coupling direct au logger = parser reste pur, testable.
+- S2.2 (watcher tests) a couvert le pire scénario (split-line en milieu de write) sans avoir besoin de simuler chokidar — driver `handleAddOrChange` directement contre un tmp dir suffit. 17 specs en ~1h.
+- Le rythme commit-après-chaque-story tient. Chaque livrable a un commit propre, message structuré, dépendances bien découpées.
+
+**Ce qui a été dur**
+- Le typage TS de la `z.union` (pas de narrowing automatique sur le discriminator dans Zod 4) m'a coûté un aller-retour. J'ai d'abord essayé `z.discriminatedUnion` puis suis retombé sur un cast manuel — pas idéal pour un schéma "exemplaire", mais fonctionnellement OK.
+- Le `Omit<SessionWatcher, never> & {...}` pour exposer les méthodes privées en tests est moche mais robuste. L'alternative (rendre `handleAddOrChange` public) aurait pollué l'API. À garder en tête : si on doit tester des trucs encore plus internes, mieux vaut refactorer.
+- `noImplicitReturns` n'a rien fait remonter — bon signe, le code était déjà discipliné.
+
+**Décisions retenues**
+- Zod plutôt que typebox : plus mature, communauté plus large, l'API `safeParse` est ergonomique. Pas de regret.
+- Pas d'ESLint pour le moment : strict TS couvre 80 % de la valeur, on gardera lint pour quand on hire un freelance (PT.6).
+- Pin Node 22 (LTS) dans `.nvmrc` pour CI, même si dev sur Node 26 localement. Plus stable et plus largement supporté côté GitHub Actions.
+
+**Ce qu'on garde pour Sprint 3**
+- Aucune story de S2 ne déborde — 5/5 livrées, marge confortable.
+- PT.6 (ESLint) en backlog, à programmer dans S3 ou plus tard.
+- Le sink Zod télémétrie est wiré en debug. Si on voit des drifts réels (logs ou bug user), il faudra peut-être l'élever en warn — à monitorer en dogfooding.
+
+---
+
+## Sprint 3 — Packaging Electron (à démarrer)
+
+**Phase** : 1 — Foundation Pro (final sprint avant Phase 2 Talk-to-Agents)
+**Goal** : sortir du `npm run dev` en parallèle. L'app devient un .dmg / .AppImage installable, hébergeant son propre Node server, qui auto-update.
+
+| ID | Story | Effort | Notes |
+|---|---|---|---|
+| S3.1 | Bootstrap Electron + bundle Node server + Vite build | 2j | Le gros morceau : ipcMain pour spawn le watcher, electron-builder pour la cross-platform |
+| S3.2 | Auto-update via electron-updater + GitHub releases | 1j | Bénéfice direct user : on pousse des fixes sans demander de réinstaller |
+| S3.3 | Icons + branding minimal (logo, splash) | 0.5j | Première impression visuelle |
+| S3.4 | Build matrice macOS arm64 / macOS x64 / Linux x64 | 1j | Notarisation macOS reportée à S7.4 (besoin d'un Apple Developer ID payant) |
+
+Budget : 4.5j dev sur 10j calendaires. Marge pour dogfooding de la version packagée et bugs cross-platform.
+
+**Ma proposition de séquence** : S3.1 en premier (sans ça rien d'autre n'a de sens) → S3.3 (court, motivant visuellement) → S3.4 (la matrice de build) → S3.2 (auto-update, dernier car dépend des releases GitHub qu'on doit avoir pu publier au moins une fois).
 
 ---
 
