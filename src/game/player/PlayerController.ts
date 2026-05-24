@@ -10,6 +10,7 @@ import type { House } from "../world/houseLayout";
 import type { Direction, NpcInstance } from "../agents/types";
 import type { NpcManager } from "../agents/NpcManager";
 import type { DialogueUI } from "../ui/DialogueUI";
+import type { NavGrid } from "../world/NavGrid";
 
 interface AutoWalkState {
   waypoints: Array<{ x: number; y: number }>;
@@ -36,6 +37,7 @@ export class PlayerController {
   private interactKey!: Phaser.Input.Keyboard.Key;
   private lastDir: Direction = "down";
   private autoWalk?: AutoWalkState;
+  private navGrid?: NavGrid;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -79,6 +81,11 @@ export class PlayerController {
   /** The player sprite for collider wiring and camera follow. */
   get sprite(): Phaser.Physics.Arcade.Sprite {
     return this.player;
+  }
+
+  /** Wire the nav grid for A* click-to-walk. Call once after CollisionLayer.load. */
+  setNavGrid(grid: NavGrid): void {
+    this.navGrid = grid;
   }
 
   /**
@@ -197,17 +204,33 @@ export class PlayerController {
   }
 
   private startAutoWalk(npc: NpcInstance): void {
-    const house = this.deps.findHouseForNpc(npc);
-    const waypoints: Array<{ x: number; y: number }> = [];
+    // Aim a few pixels below the agent so the player ends up facing them.
+    const goal = { x: npc.sprite.x, y: npc.sprite.y + 24 };
+    const start = { x: this.player.x, y: this.player.y };
 
-    // Route via the house entrance only if the player is outside / below the
-    // building, otherwise it's faster to head straight there.
-    const alreadyInside = house ? this.player.y < house.center.y + 140 : true;
-    if (house && !alreadyInside) {
-      waypoints.push({ x: house.entrance.x, y: house.entrance.y });
+    let waypoints: Array<{ x: number; y: number }> | null = null;
+
+    if (this.navGrid) {
+      const path = this.navGrid.findPath(start, goal);
+      if (path && path.length > 0) {
+        // Drop the first waypoint (= snapped current position) to avoid a
+        // pointless micro-step at the start.
+        waypoints = path.slice(1);
+        if (waypoints.length === 0) waypoints = [goal];
+      }
     }
-    // Stop a few pixels below the agent so the player ends up facing them.
-    waypoints.push({ x: npc.sprite.x, y: npc.sprite.y + 24 });
+
+    if (!waypoints) {
+      // Fallback: route via the house entrance when the player is clearly
+      // outside, otherwise head straight there.
+      const house = this.deps.findHouseForNpc(npc);
+      const alreadyInside = house ? this.player.y < house.center.y + 140 : true;
+      waypoints = [];
+      if (house && !alreadyInside) {
+        waypoints.push({ x: house.entrance.x, y: house.entrance.y });
+      }
+      waypoints.push(goal);
+    }
 
     this.autoWalk = {
       waypoints,

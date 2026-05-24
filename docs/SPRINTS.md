@@ -97,7 +97,7 @@ NpcManager reste épais à cause du sprite loader (buildCharacterAnimations + en
 | S2.2 | Tests `server/watcher.ts` (add/change/unlink, byte offset, sub-agents) | 1j | Le watcher est le 2e composant le plus à risque après parser.ts |
 | S2.3 | Strict TS settings (`noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) | 0.5j | Filet de sécurité |
 | S2.4 | CI GitHub Actions (tsc + vitest + lint sur PR) | 0.5j | Le repo n'est pas encore public, mais on le prépare |
-| S2.5 | **A\* pathfinding grid-based** (player + NPCs) | 2j | Pain point user, ouvre la voie aux comportements riches du Sprint 7 |
+| S2.5 | **A\* pathfinding grid-based** (player + NPCs) | 2j | **livré** — `NavGrid` 24px cells, 14 tests verts, intégré au PlayerController + NpcManager |
 
 Budget : 5j dev sur 10j calendaires. Marge confortable pour le dogfooding et les pivots.
 

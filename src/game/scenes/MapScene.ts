@@ -14,6 +14,7 @@ import {
   CollisionLayer,
   type CollisionsFile,
 } from "../world/CollisionLayer";
+import { NavGrid } from "../world/NavGrid";
 
 const BACKGROUND_KEY = "workspace-background";
 
@@ -88,6 +89,21 @@ export class MapScene extends Phaser.Scene {
     // Static collision rectangles.
     const collisions = this.cache.json.get("collisions") as CollisionsFile;
     this.collision.load(collisions, { debug: this.debugMode });
+
+    // Nav grid for A* pathfinding (player click-to-walk + NPC wander targets).
+    // 24px cells = 3× finer than the 72px logical grid, fine enough to weave
+    // between buildings. Margin ~24px keeps the agent *centre* off walls.
+    const navGrid = NavGrid.buildFromObstacles(
+      {
+        widthPx: GRID.width,
+        heightPx: GRID.height,
+        cellSize: 24,
+        margin: 24,
+      },
+      this.collision.rects
+    );
+    this.playerController.setNavGrid(navGrid);
+    this.npcManager.setNavGrid(navGrid);
 
     // Player (sprite + keyboard + autopilot).
     const player = this.playerController.init({

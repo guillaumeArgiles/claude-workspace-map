@@ -32,6 +32,9 @@ export class CollisionLayer {
   /** The Arcade Physics static group everything collides against. */
   obstacles!: Phaser.Physics.Arcade.StaticGroup;
 
+  /** Rectangles fed into NavGrid for pathfinding. Mirrors the obstacles list. */
+  readonly rects: CollisionRect[] = [];
+
   // Drawing-tool state (debug only)
   private drawStart?: { x: number; y: number };
   private drawingPreview?: Phaser.GameObjects.Graphics;
@@ -46,6 +49,7 @@ export class CollisionLayer {
     this.obstacles = this.scene.physics.add.staticGroup();
     for (const rect of file.rects) {
       this.addObstacle(rect);
+      this.rects.push(rect);
       if (opts.debug) this.drawDebugRect(rect);
     }
   }
@@ -199,6 +203,7 @@ export class CollisionLayer {
       .setDepth(layerDepth.UI);
 
     const zone = this.addObstacle(rect);
+    this.rects.push(rect);
     this.drawnRects.push({ rect, graphic: g, label, zone });
     console.log("[debug] new rect:", JSON.stringify(rect));
   }
@@ -232,6 +237,8 @@ export class CollisionLayer {
     last.graphic.destroy();
     last.label.destroy();
     last.zone.destroy();
+    const idx = this.rects.indexOf(last.rect);
+    if (idx >= 0) this.rects.splice(idx, 1);
   }
 
   private resetDrawn(): void {

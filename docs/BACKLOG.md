@@ -29,13 +29,13 @@ But : PoC → outil installable, stable, partageable.
 - [ ] **S2.2** Tests sur `server/watcher.ts` (add/change/unlink, byte offset, sub-agents)
 - [ ] **S2.3** Strict TS settings (noUnusedLocals, noUnusedParameters, noImplicitReturns)
 - [ ] **S2.4** CI GitHub Actions : tsc + vitest + lint sur PR
-- [ ] **S2.5** **Pathfinding A\* grid-based** pour le player (auto-walk) ET les NPCs (wander)
-  - Construire une nav-grid 1440×864 (cellules 16 ou 24 px) marquée walkable/blocked depuis `collisions.json` + une marge autour des obstacles
-  - A* avec heuristique Chebyshev (8-direction), smoothing Bresenham pour les diagonales propres
-  - Remplace `playerAutoWalk` (ligne droite + sliding) par chemin pré-calculé
-  - Étend `NpcManager.pickWanderTarget` pour rejeter les cibles unreachable
-  - Mode `?debug` : visualiser la nav-grid en overlay
-  - **Source** : pain point user (S1 feedback, blocage régulier dans les murs)
+- [x] **S2.5** **Pathfinding A\* grid-based** pour le player (auto-walk) ET les NPCs (wander) — livré
+  - `src/game/world/NavGrid.ts` : nav-grid 24px construite depuis `collisions.json` + margin 24px
+  - A* 8-direction, heuristique Chebyshev, smoothing line-of-sight, anti corner-cutting
+  - `PlayerController.startAutoWalk` consomme `findPath` (fallback heuristique entrance si pas de grid)
+  - `NpcManager.pickWanderTarget` consomme `randomWalkableNear` (fallback random)
+  - 14 tests vitest (`NavGrid.test.ts`), tous verts
+  - Restant (optionnel) : overlay debug ?nav, pas urgent pour le pain point user
 
 ### Sprint 3 — Packaging Electron
 

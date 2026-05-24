@@ -17,6 +17,7 @@ import {
   TARGET_NATIVE_HEIGHT,
 } from "../world/gameplayConstants";
 import type { Direction, NpcDef, NpcInstance } from "./types";
+import type { NavGrid } from "../world/NavGrid";
 
 /**
  * Owns every visual + AI concern for the cast of characters on the map
@@ -32,7 +33,14 @@ export class NpcManager {
   /** IDs of characters whose `right` direction is the flipped `left` sprite. */
   private readonly charNeedsRightFlip = new Set<string>();
 
+  private navGrid?: NavGrid;
+
   constructor(private readonly scene: Phaser.Scene) {}
+
+  /** Wire the nav grid for collision-aware wandering. */
+  setNavGrid(grid: NavGrid): void {
+    this.navGrid = grid;
+  }
 
   /** Build the physics group + collider wiring. Call once in scene.create(). */
   init(args: {
@@ -325,6 +333,16 @@ export class NpcManager {
   }
 
   private pickWanderTarget(npc: NpcInstance): { x: number; y: number } {
+    // Prefer a walkable target inside the wander ring around home. Falls back
+    // to a random point — the stuck-detection loop will catch it.
+    if (this.navGrid) {
+      const pt = this.navGrid.randomWalkableNear(
+        npc.home,
+        20,
+        NPC_WANDER_RADIUS
+      );
+      if (pt) return pt;
+    }
     const angle = Math.random() * Math.PI * 2;
     const radius = Phaser.Math.Between(20, NPC_WANDER_RADIUS);
     return {
