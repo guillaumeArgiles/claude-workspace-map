@@ -1,0 +1,49 @@
+appId: dev.claudeworkspace.map
+productName: Claude Workspace Map
+copyright: Copyright © 2026
+
+# Point Electron at the compiled main-process entry
+# (must match the `main` field in package.json)
+
+directories:
+  output: release
+
+# Files shipped inside the ASAR archive:
+# - compiled renderer bundle
+# - compiled main-process + preload bundles
+# - production node_modules (chokidar, pino, pino-pretty, zod + their deps)
+#   → electron-builder auto-includes everything listed in `dependencies`
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+
+# macOS targets (notarisation deferred to S7.4 — needs Apple Developer ID)
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.developer-tools
+  # icon: build/icon.icns  ← added in S3.3
+
+# Linux target
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Development
+  # icon: build/icon.png  ← added in S3.3
+
+# Disable code signing for now (S7.4 handles proper signing)
+mac:
+  identity: null
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.developer-tools
+
+# Auto-update feed — configured in S3.2 once we have a first GitHub release
+# publish:
+#   provider: github
+#   owner: <owner>
+#   repo: claude-workspace-map

@@ -18,5 +18,5 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "server", "shared"]
+  "include": ["src", "server", "shared", "electron"]
 }
