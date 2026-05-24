@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   AgentState,
   ServerEvent,
@@ -59,6 +59,14 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   const [recentCwds, setRecentCwds] = useState<string[]>(loadRecentCwds);
   /** sessionId being resumed right now (shows spinner in that row). */
   const [resumingId, setResumingId] = useState<string | null>(null);
+
+  // ── Chat state ─────────────────────────────────────────────────────────────
+  /** sessionId whose chat input is open. */
+  const [chatOpenId, setChatOpenId] = useState<string | null>(null);
+  /** Current draft text (shared — only one chat open at a time). */
+  const [chatDraft, setChatDraft] = useState("");
+  /** sessionId currently being sent (shows spinner). */
+  const [chatSendingId, setChatSendingId] = useState<string | null>(null);
 
   // ── SSE subscription ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -167,11 +175,80 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   function handleAgentClick(agent: AgentState) {
     const pty = ptySessions.find((p) => p.cwd === agent.cwd);
     if (pty) {
-      // Already have a terminal open for this cwd — restore it
       restoreTerminal(pty.ptyId);
     } else {
-      // Resume the existing Claude session via `claude --resume <sessionId>`
       void resumeSession(agent);
+    }
+  }
+
+  // ── Chat helpers ──────────────────────────────────────────────────────────
+
+  /**
+   * Ensure a background PTY exists for `cwd`.
+   * If one already exists (visible or minimized), reuse it.
+   * Otherwise spawn `claude --continue` minimised (no terminal overlay).
+   * Returns the ptyId, or null on failure.
+   */
+  async function ensurePty(cwd: string): Promise<string | null> {
+    const existing = ptySessions.find((p) => p.cwd === cwd);
+    if (existing) return existing.ptyId;
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd, command: "claude --continue" }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { ptyId } = (await res.json()) as { ptyId: string };
+      // Track it as a minimised session — no terminal overlay until user asks.
+      setRecentCwds((prev) => {
+        const next = [cwd, ...prev.filter((c) => c !== cwd)].slice(0, 10);
+        saveRecentCwds(next);
+        return next;
+      });
+      setPtySessions((prev) => [
+        ...prev.filter((p) => p.cwd !== cwd),
+        { ptyId, cwd, minimized: true },
+      ]);
+      return ptyId;
+    } catch (err) {
+      console.error("Failed to ensure PTY for chat:", err);
+      return null;
+    }
+  }
+
+  /** Send a freeform message to the agent running in `cwd`. */
+  async function sendChatMessage(agent: AgentState, message: string) {
+    const text = message.trim();
+    if (!text || chatSendingId) return;
+
+    setChatSendingId(agent.sessionId);
+    try {
+      const ptyId = await ensurePty(agent.cwd);
+      if (!ptyId) return;
+
+      await fetch(`/api/sessions/${ptyId}/write`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text + "\r" }),
+      });
+      setChatDraft("");
+      // Keep chat open for follow-up messages.
+    } catch (err) {
+      console.error("Chat send failed:", err);
+    } finally {
+      setChatSendingId(null);
+    }
+  }
+
+  /** Toggle the chat input for a given session. */
+  function toggleChat(sessionId: string) {
+    if (chatOpenId === sessionId) {
+      setChatOpenId(null);
+      setChatDraft("");
+    } else {
+      setChatOpenId(sessionId);
+      setChatDraft("");
     }
   }
 
@@ -255,7 +332,13 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
                         agent={a}
                         pty={pty}
                         resuming={resumingId === a.sessionId}
+                        chatOpen={chatOpenId === a.sessionId}
+                        chatDraft={chatOpenId === a.sessionId ? chatDraft : ""}
+                        chatSending={chatSendingId === a.sessionId}
                         onClick={() => handleAgentClick(a)}
+                        onChatToggle={() => toggleChat(a.sessionId)}
+                        onChatDraftChange={setChatDraft}
+                        onChatSend={(msg) => void sendChatMessage(a, msg)}
                       />
                     );
                   })}
@@ -301,57 +384,120 @@ function AgentRow({
   agent,
   pty,
   resuming,
+  chatOpen,
+  chatDraft,
+  chatSending,
   onClick,
+  onChatToggle,
+  onChatDraftChange,
+  onChatSend,
 }: {
   agent: AgentState;
   pty?: ActivePty;
   resuming: boolean;
+  chatOpen: boolean;
+  chatDraft: string;
+  chatSending: boolean;
   onClick: () => void;
+  onChatToggle: () => void;
+  onChatDraftChange: (v: string) => void;
+  onChatSend: (msg: string) => void;
 }) {
   const liveSubs = agent.subAgents.filter((s) => !s.finished);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  let title: string;
-  if (resuming)          title = "Opening Claude Code…";
-  else if (pty?.minimized) title = "Restore terminal";
-  else if (pty)          title = "Terminal open — click to bring up";
-  else                   title = `Resume this session in Claude Code (${agent.sessionId.slice(0, 8)}…)`;
+  // Auto-focus the chat input when it opens.
+  useEffect(() => {
+    if (chatOpen) inputRef.current?.focus();
+  }, [chatOpen]);
+
+  let termTitle: string;
+  if (resuming)            termTitle = "Opening Claude Code…";
+  else if (pty?.minimized) termTitle = "Restore terminal";
+  else if (pty)            termTitle = "Terminal open — click to bring up";
+  else                     termTitle = `Resume this session in Claude Code (${agent.sessionId.slice(0, 8)}…)`;
 
   return (
     <li className="agent">
-      <div
-        className={`agent-head ${resuming ? "resuming" : ""}`}
-        role="button"
-        tabIndex={0}
-        onClick={resuming ? undefined : onClick}
-        onKeyDown={(e) => { if (!resuming && (e.key === "Enter" || e.key === " ")) onClick(); }}
-        title={title}
-        aria-busy={resuming}
-      >
-        <span className="icon teacher" style={spriteStyle(teacherSpriteFor(agent.sessionId))} />
-        <div className="meta">
-          <div className="line">
-            <span className="status-dot" style={{ background: STATUS_COLOR[agent.status] }} />
-            <span className="status">{STATUS_LABEL[agent.status]}</span>
-            {agent.currentTool ? <span className="tool"> · {agent.currentTool}</span> : null}
+      <div className="agent-head-row">
+        {/* ── Main clickable area (status + tool detail) ─────────────────── */}
+        <div
+          className={`agent-head ${resuming ? "resuming" : ""}`}
+          role="button"
+          tabIndex={0}
+          onClick={resuming ? undefined : onClick}
+          onKeyDown={(e) => { if (!resuming && (e.key === "Enter" || e.key === " ")) onClick(); }}
+          title={termTitle}
+          aria-busy={resuming}
+        >
+          <span className="icon teacher" style={spriteStyle(teacherSpriteFor(agent.sessionId))} />
+          <div className="meta">
+            <div className="line">
+              <span className="status-dot" style={{ background: STATUS_COLOR[agent.status] }} />
+              <span className="status">{STATUS_LABEL[agent.status]}</span>
+              {agent.currentTool ? <span className="tool"> · {agent.currentTool}</span> : null}
+            </div>
+            {agent.currentToolDetail ? (
+              <div className="detail" title={agent.currentToolDetail}>{agent.currentToolDetail}</div>
+            ) : null}
           </div>
-          {agent.currentToolDetail ? (
-            <div className="detail" title={agent.currentToolDetail}>{agent.currentToolDetail}</div>
-          ) : null}
+          {/* Terminal badge */}
+          {resuming ? (
+            <span className="terminal-badge resuming-badge" title="Launching…">···</span>
+          ) : pty ? (
+            <span
+              className={`terminal-badge ${pty.minimized ? "minimized" : "active"}`}
+              title={pty.minimized ? "Terminal minimized — click to restore" : "Terminal open"}
+            >
+              &gt;_
+            </span>
+          ) : (
+            <span className="terminal-badge resume-hint" title={termTitle}>▶</span>
+          )}
         </div>
-        {/* Badge: spinner while resuming, >_ badge when PTY is attached */}
-        {resuming ? (
-          <span className="terminal-badge resuming-badge" title="Launching…">···</span>
-        ) : pty ? (
-          <span
-            className={`terminal-badge ${pty.minimized ? "minimized" : "active"}`}
-            title={pty.minimized ? "Terminal minimized — click to restore" : "Terminal open"}
-          >
-            &gt;_
-          </span>
-        ) : (
-          <span className="terminal-badge resume-hint" title={title}>▶</span>
-        )}
+
+        {/* ── Chat toggle button ─────────────────────────────────────────── */}
+        <button
+          className={`chat-toggle-btn ${chatOpen ? "active" : ""}`}
+          onClick={(e) => { e.stopPropagation(); onChatToggle(); }}
+          title={chatOpen ? "Close chat" : "Send a message to this agent"}
+          aria-pressed={chatOpen}
+        >
+          💬
+        </button>
       </div>
+
+      {/* ── Inline chat input ──────────────────────────────────────────────── */}
+      {chatOpen && (
+        <div className="chat-panel">
+          <input
+            ref={inputRef}
+            className="chat-input"
+            type="text"
+            value={chatDraft}
+            placeholder="Type a message…"
+            disabled={chatSending}
+            onChange={(e) => onChatDraftChange(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation(); // prevent Phaser from eating key events
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onChatSend(chatDraft);
+              }
+              if (e.key === "Escape") onChatToggle();
+            }}
+          />
+          <button
+            className="chat-send-btn"
+            disabled={chatSending || !chatDraft.trim()}
+            onClick={() => onChatSend(chatDraft)}
+            title="Send (Enter)"
+          >
+            {chatSending ? "…" : "↵"}
+          </button>
+        </div>
+      )}
+
       {liveSubs.length > 0 && (
         <ul className="subs">
           {liveSubs.map((s) => <SubAgentRow key={s.id} sub={s} />)}
