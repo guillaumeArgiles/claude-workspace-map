@@ -3,7 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { parseLine, applyToAgentStatus, subAgentChanges, toolDetail, lastToolUse } from "./parser.js";
+import { child } from "./logger.js";
 import type { AgentState, SubAgentState } from "../shared/agent-types.js";
+
+const log = child("watcher");
 
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 /** A session is "active" if it had any activity within this many milliseconds. */
@@ -109,20 +112,20 @@ export class SessionWatcher {
 
     this.watcher
       .on("add", (file) => {
-        if (isJsonl(file)) this.handleAddOrChange(file).catch(console.error);
+        if (isJsonl(file)) this.handleAddOrChange(file).catch((err) => log.error({ err, file }, "add handler failed"));
       })
       .on("change", (file) => {
-        if (isJsonl(file)) this.handleAddOrChange(file).catch(console.error);
+        if (isJsonl(file)) this.handleAddOrChange(file).catch((err) => log.error({ err, file }, "change handler failed"));
       })
       .on("unlink", (file) => {
         if (isJsonl(file)) this.handleRemove(file);
       })
       .on("ready", () => {
-        console.log(`[watcher] ready — tracking ${this.trackers.size} session(s)`);
+        log.info({ sessions: this.trackers.size }, "watcher ready");
       })
-      .on("error", (err) => console.error("[watcher] error:", err));
+      .on("error", (err) => log.error({ err }, "watcher error"));
 
-    console.log(`[watcher] watching ${CLAUDE_PROJECTS_DIR}`);
+    log.info({ dir: CLAUDE_PROJECTS_DIR }, "watching projects directory");
   }
 
   async stop(): Promise<void> {

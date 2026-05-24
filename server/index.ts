@@ -1,6 +1,9 @@
 import http from "node:http";
 import { SessionWatcher } from "./watcher.js";
+import { child, logger } from "./logger.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
+
+const log = child("server");
 
 const PORT = Number(process.env.PORT ?? 4000);
 
@@ -62,7 +65,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(204);
       res.end();
     } catch (err) {
-      console.warn("[server] /api/hook bad payload:", err);
+      log.warn({ err }, "/api/hook bad payload");
       res.writeHead(400, { "Content-Type": "text/plain" });
       res.end("Bad JSON");
     }
@@ -75,13 +78,17 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, async () => {
   await watcher.start();
-  console.log(`[server] http://localhost:${PORT}`);
-  console.log(`[server] GET /api/state   — current snapshot`);
-  console.log(`[server] GET /api/events  — SSE stream`);
+  log.info(
+    {
+      port: PORT,
+      endpoints: ["GET /api/state", "GET /api/events", "POST /api/hook"],
+    },
+    "server up"
+  );
 });
 
 const shutdown = async () => {
-  console.log("[server] shutting down…");
+  log.info("server shutting down…");
   await watcher.stop();
   server.close(() => process.exit(0));
 };
