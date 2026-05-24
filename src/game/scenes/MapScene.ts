@@ -31,7 +31,14 @@ export class MapScene extends Phaser.Scene {
   private npcManager = new NpcManager(this);
   private dialogue = new DialogueUI(this);
   private agentSyncer = new AgentSyncer(this, this.npcManager, this.dialogue, {
-    onStatusChange: (text) => this.statusText?.setText(text),
+    onStatusChange: (text, severity) => {
+      if (!this.statusText) return;
+      this.statusText.setText(text);
+      // Red background when we lost the stream, neutral otherwise.
+      this.statusText.setBackgroundColor(
+        severity === "warn" ? "#7f1d1daa" : "#000000aa"
+      );
+    },
   });
   private playerController = new PlayerController(
     this,

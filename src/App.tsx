@@ -3,6 +3,7 @@ import Phaser from "phaser";
 import { GRID } from "./game/config/grid";
 import { MapScene } from "./game/scenes/MapScene";
 import { AgentSidebar } from "./components/AgentSidebar";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 export function App() {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -52,10 +53,27 @@ export function App() {
   return (
     <div id="app-shell" className={sidebarCollapsed ? "sidebar-collapsed" : ""}>
       <div id="game-mount" ref={mountRef} />
-      <AgentSidebar
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed((c) => !c)}
-      />
+      <ErrorBoundary
+        label="AgentSidebar"
+        fallback={(err, reset) => (
+          <aside id="agent-sidebar" className="errored">
+            <header>
+              <span className="dot ko" />
+              <h2>Live Claude sessions</h2>
+            </header>
+            <div className="boundary-fallback">
+              <p>The sidebar crashed.</p>
+              <code>{err.message}</code>
+              <button onClick={reset}>Retry</button>
+            </div>
+          </aside>
+        )}
+      >
+        <AgentSidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed((c) => !c)}
+        />
+      </ErrorBoundary>
     </div>
   );
 }

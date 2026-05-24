@@ -19,9 +19,14 @@ import type { NpcDef, NpcInstance } from "./types";
 import type { NpcManager } from "./NpcManager";
 import type { DialogueUI } from "../ui/DialogueUI";
 
+export type StatusSeverity = "info" | "warn";
+
 export interface AgentSyncerCallbacks {
-  /** Called when the underlying SSE stream opens, closes, or the agent count changes. */
-  onStatusChange?: (text: string) => void;
+  /**
+   * Called when the underlying SSE stream opens, closes, or the agent count
+   * changes. `severity` lets the HUD pick a colour (warn = red, info = neutral).
+   */
+  onStatusChange?: (text: string, severity: StatusSeverity) => void;
 }
 
 /**
@@ -46,9 +51,9 @@ export class AgentSyncer {
   ) {}
 
   start(): void {
-    this.agentSource.on("open", () => this.report("Connected • 0 agent(s)"));
+    this.agentSource.on("open", () => this.reportCount());
     this.agentSource.on("error", () =>
-      this.report("⚠ /api/events disconnected — retrying…")
+      this.report("⚠ /api/events disconnected — retrying…", "warn")
     );
     this.agentSource.on("snapshot", (agents) => {
       // Reset world and replay each agent through spawn.
@@ -320,12 +325,12 @@ export class AgentSyncer {
 
   // ----- Internal: status callback plumbing -----
 
-  private report(text: string): void {
-    this.callbacks.onStatusChange?.(text);
+  private report(text: string, severity: StatusSeverity = "info"): void {
+    this.callbacks.onStatusChange?.(text, severity);
   }
 
   private reportCount(): void {
     const n = this.teacherNpcs.size;
-    this.report(`Connected • ${n} agent${n === 1 ? "" : "s"}`);
+    this.report(`Connected • ${n} agent${n === 1 ? "" : "s"}`, "info");
   }
 }
