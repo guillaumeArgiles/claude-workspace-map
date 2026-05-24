@@ -5,7 +5,7 @@ import { SessionWatcher } from "./watcher.js";
 import { child } from "./logger.js";
 import { setValidationErrorSink } from "./parser.js";
 import { ptyManager } from "./pty-manager.js";
-import { streamProfessorResponse, type ProfessorRequest } from "./professor.js";
+import { streamProfessorResponse, professorAvailable, type ProfessorRequest } from "./professor.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 /** MIME types for static file serving (renderer assets in prod). */
@@ -252,6 +252,13 @@ export async function startServer(
       const ok = ptyManager.kill(deleteMatch[1]);
       res.writeHead(ok ? 200 : 404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok }));
+      return;
+    }
+
+    // GET /api/professor/status — indique si ANTHROPIC_API_KEY est configurée
+    if (req.method === "GET" && url === "/api/professor/status") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ available: professorAvailable }));
       return;
     }
 

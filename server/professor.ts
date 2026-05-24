@@ -17,7 +17,10 @@ import { child } from "./logger.js";
 
 const log = child("professor");
 
-const client = new Anthropic();
+/** True if the API key is available — used to give a clear UX error instead of a crash. */
+export const professorAvailable = !!process.env.ANTHROPIC_API_KEY;
+
+const client = professorAvailable ? new Anthropic() : null;
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -126,6 +129,11 @@ export async function streamProfessorResponse(
 
   if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
     write(`data: ${JSON.stringify({ error: "Last message must be from user" })}\n\n`);
+    return;
+  }
+
+  if (!client) {
+    write(`data: ${JSON.stringify({ error: "no_api_key" })}\n\n`);
     return;
   }
 

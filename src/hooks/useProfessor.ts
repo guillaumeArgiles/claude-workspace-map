@@ -104,6 +104,17 @@ export function useProfessor(): UseProfessorReturn {
                 return next;
               });
             } else if ("error" in event) {
+              const msg = event.error === "no_api_key"
+                ? "Je ne suis pas disponible — configure ta clef ANTHROPIC_API_KEY pour m'activer."
+                : "Une erreur est survenue, réessaie.";
+              setMessages((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last?.role === "assistant") {
+                  next[next.length - 1] = { ...last, content: msg };
+                }
+                return next;
+              });
               console.error("Professor error:", event.error);
             }
           } catch {
