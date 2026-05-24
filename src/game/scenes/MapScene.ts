@@ -162,9 +162,7 @@ export class MapScene extends Phaser.Scene {
       x: GRID.width / 2,
       y: GRID.height - 250,
       dialogue: "Comment puis-je t'aider ?",
-      sprite: "",
-      hairColor: "#f59e0b",   // amber — academic/wise
-      clothesColor: "#4338ca", // indigo — academic robe
+      sprite: "player", // réutilise le sprite du joueur en attendant un sprite dédié
       static: true,
     });
 
