@@ -304,6 +304,90 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   const totalSubs = agents.reduce((acc, a) => acc + a.subAgents.filter((s) => !s.finished).length, 0);
   const inactiveCount = agents.filter((a) => a.status === "done" || a.status === "idle").length;
 
+  // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+  /** Index into the flat agent list for Tab cycling. */
+  const cycleIdxRef = useRef(0);
+  /** Always-current snapshot of reactive values used inside the stable handler. */
+  const kbRef = useRef({ groups, ptySessions, inactiveCount });
+  kbRef.current = { groups, ptySessions, inactiveCount };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Never fire while the user is typing in a form field or the spawn panel.
+      const t = e.target as HTMLElement;
+      if (
+        t.tagName === "INPUT" ||
+        t.tagName === "TEXTAREA" ||
+        t.isContentEditable
+      ) return;
+
+      const { groups, ptySessions, inactiveCount } = kbRef.current;
+
+      // 1 / 2 / 3 → jump player to house 1/2/3
+      if (e.key === "1" || e.key === "2" || e.key === "3") {
+        const group = groups[Number(e.key) - 1];
+        if (group) uiBus.emit("highlight_agent", { id: group.agents[0].sessionId });
+        return;
+      }
+
+      switch (e.key) {
+        // N → open spawn panel
+        case "n": case "N":
+          e.preventDefault();
+          setShowSpawnPanel(true);
+          setSpawnDefaultCwd("");
+          break;
+
+        // P → spawn Professor
+        case "p": case "P":
+          e.preventDefault();
+          spawnProfessorRef.current();
+          break;
+
+        // Backspace → bulk clear done/idle agents
+        case "Backspace":
+          if (inactiveCount > 0) {
+            e.preventDefault();
+            fetch("/api/agents", { method: "DELETE" }).catch(() => {});
+          }
+          break;
+
+        // B → request desktop notification permission
+        case "b": case "B":
+          if ("Notification" in window) {
+            e.preventDefault();
+            void Notification.requestPermission().then((p) => setNotifPermission(p));
+          }
+          break;
+
+        // Tab → cycle through agents (player walks to each one in turn)
+        case "Tab": {
+          e.preventDefault();
+          const flat = groups.flatMap((g) => g.agents);
+          if (!flat.length) break;
+          cycleIdxRef.current = (cycleIdxRef.current + 1) % flat.length;
+          uiBus.emit("highlight_agent", { id: flat[cycleIdxRef.current].sessionId });
+          break;
+        }
+
+        // Escape → close the most-recently-opened terminal overlay
+        case "Escape": {
+          const open = ptySessions.filter((p) => !p.minimized);
+          if (open.length) {
+            e.preventDefault();
+            const last = open[open.length - 1];
+            setPtySessions((prev) => prev.filter((p) => p.ptyId !== last.ptyId));
+            fetch(`/api/sessions/${last.ptyId}`, { method: "DELETE" }).catch(() => {});
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []); // stable: kbRef + stable setters
+
   // ── Collapsed sidebar ─────────────────────────────────────────────────────
   if (collapsed) {
     return (
