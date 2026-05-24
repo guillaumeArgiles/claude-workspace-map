@@ -141,10 +141,13 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   }
 
   /**
-   * Open (or restore) a terminal for an existing agent session.
-   * Uses `claude --continue` to resume the last conversation in cwd.
-   * Note: `--resume <UUID>` triggers a git-diff crash in Claude Code's Bun
-   * runtime for non-recent sessions; `--continue` is safe.
+   * Open a terminal for an existing agent's cwd.
+   *
+   * We intentionally omit --continue / --resume: both flags trigger a
+   * git-diff crash in Claude Code's Bun runtime when the conversation is
+   * long or the session is not recent (unhandled exception in the diff-stats
+   * initialiser). Opening a plain `claude` session in the correct cwd lets
+   * the user manually run `--continue` inside if they want history.
    */
   async function resumeSession(agent: AgentState) {
     if (resumingId) return; // debounce
@@ -153,13 +156,13 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cwd: agent.cwd, command: "claude --continue" }),
+        body: JSON.stringify({ cwd: agent.cwd }),
       });
       if (!res.ok) throw new Error(await res.text());
       const { ptyId } = (await res.json()) as { ptyId: string };
       handleSpawned({ ptyId, cwd: agent.cwd, spawnedAt: Date.now() });
     } catch (err) {
-      console.error("Failed to resume session:", err);
+      console.error("Failed to open session:", err);
     } finally {
       setResumingId(null);
     }
