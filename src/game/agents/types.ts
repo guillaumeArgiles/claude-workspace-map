@@ -31,6 +31,8 @@ export interface NpcDef {
   clothesColor?: string;
   /** If true, the NPC stays at its home position and doesn't wander. */
   static?: boolean;
+  /** If false, no status-dot badge is drawn (used for special NPCs like the Professor). */
+  showBadge?: boolean;
   /** Populated when the agent is waiting on ExitPlanMode approval. */
   pendingPlan?: string;
   /** Populated when the agent is waiting on AskUserQuestion. */

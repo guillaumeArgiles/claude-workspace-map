@@ -28,6 +28,7 @@ export class MapScene extends Phaser.Scene {
   private debugMode = false;
   private statusText?: Phaser.GameObjects.Text;
   private professorGlyph?: Phaser.GameObjects.Text;
+  private professorNpc?: import("../agents/types").NpcInstance;
 
   // Managers
   private collision = new CollisionLayer(this);
@@ -158,7 +159,7 @@ export class MapScene extends Phaser.Scene {
 
     // The Professor — a static NPC at the centre of the map. Always present,
     // interacting with him (E key) spawns his dedicated Claude Code session.
-    const professorNpc = this.npcManager.spawn({
+    this.professorNpc = this.npcManager.spawn({
       id: "professor",
       name: "Le Professeur",
       x: GRID.width / 2,
@@ -167,25 +168,17 @@ export class MapScene extends Phaser.Scene {
       interactLabel: "parler au Professeur",
       sprite: "profesor",
       static: true,
+      showBadge: false,
     });
 
-    // Floating 💬 glyph above the Professor — pulses gently when all agents
-    // are calm, inviting the player to come chat.
-    const glyphBaseY = professorNpc.sprite.y - 62;
+    // Floating 💬 glyph above the Professor — appears + bobs when all agents
+    // are calm, inviting the player to come chat. Positioned dynamically each
+    // frame (like repositionGlyph) so it sits correctly above the sprite.
     this.professorGlyph = this.add
-      .text(professorNpc.sprite.x, glyphBaseY, "💬", { fontSize: "20px" })
-      .setOrigin(0.5, 1)
+      .text(0, 0, "💬", { fontSize: "20px" })
+      .setOrigin(0.5, 0.5)
       .setDepth(layerDepth.OVERLAYS + 5000)
       .setVisible(false);
-
-    this.tweens.add({
-      targets: this.professorGlyph,
-      y: glyphBaseY - 9,
-      duration: 850,
-      ease: Phaser.Math.Easing.Sine.InOut,
-      yoyo: true,
-      repeat: -1,
-    });
 
     this.agentSyncer.start();
 
@@ -212,7 +205,18 @@ export class MapScene extends Phaser.Scene {
     this.agentSyncer.tickDespawns(now);
 
     // Show the 💬 invitation above Professor when no agent needs urgent attention.
-    this.professorGlyph?.setVisible(this.agentSyncer.allCalm());
+    if (this.professorGlyph && this.professorNpc) {
+      const calm = this.agentSyncer.allCalm();
+      this.professorGlyph.setVisible(calm);
+      if (calm) {
+        const sp = this.professorNpc.sprite;
+        const bob = Math.sin(this.time.now / 850) * 8;
+        this.professorGlyph.setPosition(
+          sp.x,
+          sp.y - sp.displayHeight * 0.5 - 24 + bob
+        );
+      }
+    }
   }
 
   /** Thin debug overlay drawing the 20×12 logical grid above the map. */

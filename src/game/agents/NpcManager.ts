@@ -97,7 +97,9 @@ export class NpcManager {
         this.scene.time.now + Phaser.Math.Between(NPC_PAUSE_MIN, NPC_PAUSE_MAX),
       lastDir: "down",
     };
-    instance.statusBadge = this.makeStatusBadge(def.status ?? "idle");
+    if (def.showBadge !== false) {
+      instance.statusBadge = this.makeStatusBadge(def.status ?? "idle");
+    }
     this.npcs.push(instance);
     return instance;
   }
@@ -144,7 +146,10 @@ export class NpcManager {
 
   refreshStatusBadge(npc: NpcInstance): void {
     npc.statusBadge?.destroy();
-    npc.statusBadge = this.makeStatusBadge(npc.def.status ?? "idle");
+    npc.statusBadge =
+      npc.def.showBadge !== false
+        ? this.makeStatusBadge(npc.def.status ?? "idle")
+        : undefined;
     this.refreshStatusGlyph(npc);
     // P1: clear persistent activity bubble when leaving an active status
     const s = npc.def.status;
