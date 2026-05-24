@@ -43,7 +43,7 @@ export class DialogueUI {
   setNearest(npc: NpcInstance | undefined): void {
     if (!this.promptText) return;
     if (npc && this.openFor !== npc) {
-      this.promptText.setText(`[E] parler à ${npc.def.name}`);
+      this.promptText.setText(`[E] ${npc.def.interactLabel ?? `parler à ${npc.def.name}`}`);
       this.promptText.setPosition(npc.sprite.x, npc.sprite.y - PLAYER_H);
       this.promptText.setDepth(layerDepth.OVERLAYS + Math.round(npc.sprite.y));
       this.promptText.setVisible(true);

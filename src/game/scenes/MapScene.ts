@@ -163,6 +163,7 @@ export class MapScene extends Phaser.Scene {
       x: GRID.width / 2,
       y: GRID.height - 250,
       dialogue: "Comment puis-je t'aider ?",
+      interactLabel: "parler au Professeur",
       sprite: "profesor",
       static: true,
     });

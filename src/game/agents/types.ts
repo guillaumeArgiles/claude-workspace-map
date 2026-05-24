@@ -21,6 +21,8 @@ export interface NpcDef {
   y: number;
   /** Fallback dialogue line shown if no live tool detail is available. */
   dialogue: string;
+  /** Override the "[E] parler à {name}" prompt (e.g. "parler au Professeur"). */
+  interactLabel?: string;
   /** Filename (without extension) under /assets/sprites/. */
   sprite: string;
   /** Override hair colour for programmatic sprites (hex string). */
