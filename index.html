@@ -116,30 +116,6 @@
       .crash-detail { opacity: 0.65; font-family: ui-monospace, monospace; font-size: 10.5px; }
       .crash-respawn-btn { background: #1e2d3d; border: 1px solid #3b5a80; color: #7dd3fc; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
       .crash-respawn-btn:hover { background: #264a68; border-color: #60a5fa; }
-      /* ── Chat panel in agent rows ─────────────────────────────────────────── */
-      /* Wrapper row: agent-head takes all available width, chat button is fixed */
-      .agent-head-row { display: flex; align-items: stretch; }
-      .agent-head-row .agent-head { flex: 1; min-width: 0; border-radius: 4px 0 0 4px; }
-      /* 💬 toggle button — only visible on hover or when active */
-      .chat-toggle-btn { background: transparent; border: none; border-left: 1px solid transparent; color: #4b5563; font-size: 14px; padding: 0 8px; cursor: pointer; transition: color 0.12s, background 0.12s; flex: 0 0 auto; border-radius: 0 4px 4px 0; }
-      .agent-head-row:hover .chat-toggle-btn { color: #6b7280; border-left-color: #1e2430; }
-      .chat-toggle-btn:hover { background: #1c2128; color: #a5b4fc !important; }
-      .chat-toggle-btn.active { color: #6366f1 !important; background: rgba(99,102,241,0.1); border-left-color: #2c313a; }
-      /* Chat panel — outer container is a column */
-      .chat-panel { display: flex; flex-direction: column; }
-      /* PTY output area */
-      .chat-output { margin: 0; max-height: 220px; overflow-y: auto; background: #060b12; color: #8b949e; font-size: 10px; line-height: 1.45; padding: 6px 10px; border-top: 1px solid #1c2128; white-space: pre-wrap; word-break: break-all; font-family: 'Menlo', 'Monaco', 'Consolas', monospace; }
-      @keyframes thinking-pulse { 0%,100% { opacity: 0.35; } 50% { opacity: 1; } }
-      .chat-thinking { padding: 6px 10px; font-size: 11px; color: #6366f1; border-top: 1px solid #1c2128; animation: thinking-pulse 1.4s ease-in-out infinite; }
-      /* Input row */
-      .chat-input-row { display: flex; align-items: center; gap: 6px; padding: 6px 10px 4px; }
-      .chat-input { flex: 1; background: #0d1117; border: 1px solid #2c313a; color: #eee; padding: 5px 8px; border-radius: 4px; font-size: 12px; font-family: system-ui, sans-serif; outline: none; min-width: 0; }
-      .chat-input:focus { border-color: #6366f1; }
-      .chat-input::placeholder { color: #4b5563; }
-      .chat-input:disabled { opacity: 0.5; }
-      .chat-send-btn { background: #4338ca; border: 1px solid #6366f1; color: #eee; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 700; flex: 0 0 auto; transition: background 0.1s; }
-      .chat-send-btn:hover:not(:disabled) { background: #4f46e5; }
-      .chat-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     </style>
   </head>
   <body>
