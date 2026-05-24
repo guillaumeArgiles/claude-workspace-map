@@ -1,6 +1,6 @@
 import http from "node:http";
 import { SessionWatcher } from "./watcher.js";
-import { child, logger } from "./logger.js";
+import { child } from "./logger.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 const log = child("server");

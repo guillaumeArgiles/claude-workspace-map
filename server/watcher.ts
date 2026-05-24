@@ -1,4 +1,4 @@
-import chokidar from "chokidar";
+import chokidar, { type FSWatcher } from "chokidar";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -30,7 +30,7 @@ export interface WatcherEvents {
 
 export class SessionWatcher {
   private trackers = new Map<string, SessionTracker>();
-  private watcher?: chokidar.FSWatcher;
+  private watcher?: FSWatcher;
 
   constructor(private events: WatcherEvents) {}
 
@@ -111,19 +111,25 @@ export class SessionWatcher {
     const isJsonl = (p: string) => p.endsWith(".jsonl");
 
     this.watcher
-      .on("add", (file) => {
-        if (isJsonl(file)) this.handleAddOrChange(file).catch((err) => log.error({ err, file }, "add handler failed"));
+      .on("add", (file: string) => {
+        if (isJsonl(file))
+          this.handleAddOrChange(file).catch((err: unknown) =>
+            log.error({ err, file }, "add handler failed")
+          );
       })
-      .on("change", (file) => {
-        if (isJsonl(file)) this.handleAddOrChange(file).catch((err) => log.error({ err, file }, "change handler failed"));
+      .on("change", (file: string) => {
+        if (isJsonl(file))
+          this.handleAddOrChange(file).catch((err: unknown) =>
+            log.error({ err, file }, "change handler failed")
+          );
       })
-      .on("unlink", (file) => {
+      .on("unlink", (file: string) => {
         if (isJsonl(file)) this.handleRemove(file);
       })
       .on("ready", () => {
         log.info({ sessions: this.trackers.size }, "watcher ready");
       })
-      .on("error", (err) => log.error({ err }, "watcher error"));
+      .on("error", (err: unknown) => log.error({ err }, "watcher error"));
 
     log.info({ dir: CLAUDE_PROJECTS_DIR }, "watching projects directory");
   }
