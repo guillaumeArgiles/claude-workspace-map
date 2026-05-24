@@ -185,6 +185,18 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   agentClickRef.current = handleAgentClick;
   agentsRef.current = agents;
 
+  /** Spawn the Professor NPC session and open its terminal. */
+  async function spawnProfessor() {
+    try {
+      const res = await fetch("/api/professor/spawn", { method: "POST" });
+      if (!res.ok) throw new Error(await res.text());
+      const { ptyId, cwd } = (await res.json()) as { ptyId: string; cwd: string };
+      handleSpawned({ ptyId, cwd, spawnedAt: Date.now() });
+    } catch (err) {
+      console.error("Failed to spawn Professor:", err);
+    }
+  }
+
   /** Dismiss a single agent (hide until it has new activity). */
   function dismissAgent(sessionId: string) {
     fetch(`/api/agents/${sessionId}`, { method: "DELETE" }).catch(() => {});
@@ -313,6 +325,13 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
             title="Launch a new Claude session"
           >
             ⚡
+          </button>
+          <button
+            className="professor-btn-header"
+            onClick={() => void spawnProfessor()}
+            title="Invoquer le Professeur"
+          >
+            🎓
           </button>
           {inactiveCount > 0 && (
             <button
