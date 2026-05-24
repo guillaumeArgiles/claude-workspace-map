@@ -7,9 +7,10 @@ interface TerminalOverlayProps {
   ptyId: string;
   cwd: string;
   onClose: () => void;
+  onMinimize: () => void;
 }
 
-export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
+export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize }: TerminalOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -45,12 +46,12 @@ export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
         brightWhite: "#cdd6f4",
       },
       fontFamily: "ui-monospace, 'Cascadia Code', 'Fira Code', 'Menlo', monospace",
-      fontSize: 12,
-      lineHeight: 1.4,
+      fontSize: 13,
+      lineHeight: 1.45,
       scrollback: 5000,
       cursorBlink: true,
       cursorStyle: "bar",
-      convertEol: false, // raw pass-through, PTY handles EOL
+      convertEol: false,
       allowProposedApi: false,
     });
 
@@ -63,19 +64,15 @@ export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
     fitRef.current = fit;
 
     // ── Key event isolation ─────────────────────────────────────────────
-    // Phaser's KeyboardPlugin listens on `window` and calls preventDefault()
-    // on captured keys (space, arrows…). xterm.js checks defaultPrevented
-    // before processing, so those keys silently vanish.
-    // Fix: intercept every keydown/keyup on the xterm canvas before the event
-    // bubbles up to Phaser, and stop propagation there.
-    // We let Escape through (return false = xterm ignores it) so the overlay
-    // div's own handler can close the panel.
+    // Phaser's KeyboardPlugin listens at window-level and calls
+    // preventDefault() on captured keys (space, arrows…). xterm.js checks
+    // event.defaultPrevented before processing — those keys silently vanish.
+    // Fix: stop propagation inside xterm's own handler so Phaser never sees it.
+    // Escape is let through (return false) so the overlay div can minimize.
     term.attachCustomKeyEventHandler((ev) => {
-      ev.stopPropagation(); // never reaches Phaser's window listener
-      if (ev.key === "Escape" && ev.type === "keydown") {
-        return false;       // xterm ignores Escape → overlay div catches it
-      }
-      return true;          // xterm handles everything else normally
+      ev.stopPropagation();
+      if (ev.key === "Escape" && ev.type === "keydown") return false;
+      return true;
     });
 
     // ── Send initial dimensions to PTY ──────────────────────────────────
@@ -99,14 +96,10 @@ export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
       try {
         const { chunk } = JSON.parse(e.data) as { chunk: string };
         term.write(chunk);
-      } catch {
-        /* ignore malformed frames */
-      }
+      } catch { /* ignore */ }
     };
 
     // ── Forward keyboard input to PTY ───────────────────────────────────
-    // xterm onData fires for every key sequence including arrows, Ctrl+C,
-    // UTF-8 chars, paste — exactly what the PTY expects, no processing needed.
     term.onData((data) => {
       fetch(`/api/sessions/${ptyId}/write`, {
         method: "POST",
@@ -115,11 +108,10 @@ export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
       }).catch(() => {});
     });
 
-    // ── Resize observer — keep PTY in sync with container ───────────────
+    // ── Keep PTY size in sync with container ────────────────────────────
     const resizeObserver = new ResizeObserver(() => syncSize());
     resizeObserver.observe(container);
 
-    // Focus so keystrokes reach xterm immediately
     term.focus();
 
     return () => {
@@ -132,24 +124,21 @@ export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
   }, [ptyId]);
 
   return (
-    // onKeyDown catches Escape that xterm let through (returned false above)
-    <div id="terminal-overlay" onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}>
+    // Escape minimizes (xterm lets it through via attachCustomKeyEventHandler)
+    <div
+      id="terminal-overlay"
+      onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onMinimize(); } }}
+    >
       <div id="terminal-panel">
         <header id="terminal-header">
-          <span className="term-title" title={cwd}>
-            {shortName(cwd)}
-          </span>
-          <span
-            className={`dot ${connected ? "ok" : "ko"}`}
-            title={connected ? "connected" : "disconnected"}
-          />
+          <span className="term-title" title={cwd}>{shortName(cwd)}</span>
+          <span className={`dot ${connected ? "ok" : "ko"}`} title={connected ? "connected" : "disconnected"} />
           <span className="term-pty-id">{ptyId.slice(0, 8)}</span>
-          <button className="close-btn" onClick={onClose} title="Close terminal (Esc)">
-            ✕
-          </button>
+          <div className="term-controls">
+            <button className="term-btn minimize-btn" onClick={onMinimize} title="Minimize — attach to agent">—</button>
+            <button className="term-btn close-btn" onClick={onClose} title="Close terminal">✕</button>
+          </div>
         </header>
-
-        {/* xterm.js mounts here — it creates its own canvas */}
         <div ref={containerRef} id="terminal-xterm" />
       </div>
     </div>

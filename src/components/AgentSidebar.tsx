@@ -9,11 +9,17 @@ import {
   studentSpriteFor,
 } from "../../shared/agent-sprites";
 import { STATUS_COLOR, STATUS_LABEL, statusOrder } from "../../shared/agent-ui";
-import { uiBus } from "../game/services/uiBus";
 import { SpawnPanel } from "./SpawnPanel";
 import { TerminalOverlay } from "./TerminalOverlay";
 
-/** Persist recent cwds in localStorage so SpawnPanel can offer them. */
+// ── PTY session state ───────────────────────────────────────────────────────
+export interface ActivePty {
+  ptyId: string;
+  cwd: string;
+  minimized: boolean;
+}
+
+// ── localStorage helpers ────────────────────────────────────────────────────
 function loadRecentCwds(): string[] {
   try {
     return JSON.parse(localStorage.getItem("recentCwds") ?? "[]") as string[];
@@ -21,19 +27,11 @@ function loadRecentCwds(): string[] {
     return [];
   }
 }
-
 function saveRecentCwds(cwds: string[]) {
-  try {
-    localStorage.setItem("recentCwds", JSON.stringify(cwds));
-  } catch {
-    /* ignore */
-  }
+  try { localStorage.setItem("recentCwds", JSON.stringify(cwds)); } catch { /* ignore */ }
 }
 
-/**
- * One frame of the RPG-Maker sheet (96×128, 3 cols × 4 rows). Frame (col=1,
- * row=0) is the front-facing idle pose.
- */
+// ── Sprite helper ───────────────────────────────────────────────────────────
 function spriteStyle(spriteName: string): React.CSSProperties {
   return {
     backgroundImage: `url(/assets/sprites/${spriteName}.png)`,
@@ -45,33 +43,32 @@ function spriteStyle(spriteName: string): React.CSSProperties {
   };
 }
 
+// ── Props ───────────────────────────────────────────────────────────────────
 interface AgentSidebarProps {
   collapsed: boolean;
   onToggle: () => void;
 }
 
+// ── Component ───────────────────────────────────────────────────────────────
 export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   const [agents, setAgents] = useState<AgentState[]>([]);
   const [connected, setConnected] = useState(false);
+  const [ptySessions, setPtySessions] = useState<ActivePty[]>([]);
   const [showSpawnPanel, setShowSpawnPanel] = useState(false);
-  const [activePty, setActivePty] = useState<{ ptyId: string; cwd: string } | null>(null);
+  const [spawnDefaultCwd, setSpawnDefaultCwd] = useState("");
   const [recentCwds, setRecentCwds] = useState<string[]>(loadRecentCwds);
 
+  // ── SSE subscription ──────────────────────────────────────────────────────
   useEffect(() => {
     const es = new EventSource("/api/events");
     const byId = new Map<string, AgentState>();
-
     const flush = () => setAgents(Array.from(byId.values()));
 
     es.onopen = () => setConnected(true);
     es.onerror = () => setConnected(false);
     es.onmessage = (e) => {
       let ev: ServerEvent;
-      try {
-        ev = JSON.parse(e.data);
-      } catch {
-        return;
-      }
+      try { ev = JSON.parse(e.data); } catch { return; }
       switch (ev.type) {
         case "snapshot":
           byId.clear();
@@ -87,11 +84,47 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
       }
       flush();
     };
-
     return () => es.close();
   }, []);
 
-  /** Group agents by cwd (project). Each group is sorted by status priority. */
+  // ── PTY session management ────────────────────────────────────────────────
+  function handleSpawned(session: { ptyId: string; cwd: string; spawnedAt: number }) {
+    setRecentCwds((prev) => {
+      const next = [session.cwd, ...prev.filter((c) => c !== session.cwd)].slice(0, 10);
+      saveRecentCwds(next);
+      return next;
+    });
+    setPtySessions((prev) => [
+      ...prev.filter((p) => p.ptyId !== session.ptyId),
+      { ptyId: session.ptyId, cwd: session.cwd, minimized: false },
+    ]);
+  }
+
+  function minimizeTerminal(ptyId: string) {
+    setPtySessions((prev) => prev.map((p) => p.ptyId === ptyId ? { ...p, minimized: true } : p));
+  }
+
+  function restoreTerminal(ptyId: string) {
+    setPtySessions((prev) => prev.map((p) => p.ptyId === ptyId ? { ...p, minimized: false } : p));
+  }
+
+  function closeTerminal(ptyId: string) {
+    setPtySessions((prev) => prev.filter((p) => p.ptyId !== ptyId));
+  }
+
+  /** Called when user clicks an agent row — open its terminal or spawn one. */
+  function handleAgentClick(agent: AgentState) {
+    const pty = ptySessions.find((p) => p.cwd === agent.cwd);
+    if (pty) {
+      restoreTerminal(pty.ptyId);
+    } else {
+      // No running terminal for this agent → open SpawnPanel pre-filled
+      setSpawnDefaultCwd(agent.cwd);
+      setShowSpawnPanel(true);
+    }
+  }
+
+  // ── Grouping ──────────────────────────────────────────────────────────────
   const groups = useMemo(() => {
     const byCwd = new Map<string, AgentState[]>();
     for (const a of agents) {
@@ -102,63 +135,35 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
     const result = Array.from(byCwd.entries()).map(([cwd, list]) => {
       list.sort((a, b) => {
         const so = statusOrder(a.status) - statusOrder(b.status);
-        if (so !== 0) return so;
-        return b.lastActivityAt - a.lastActivityAt;
+        return so !== 0 ? so : b.lastActivityAt - a.lastActivityAt;
       });
       return { cwd, agents: list };
     });
-    // Project ordering: most attention-grabbing agent first, fallback to recency.
     result.sort((a, b) => {
       const so = statusOrder(a.agents[0].status) - statusOrder(b.agents[0].status);
-      if (so !== 0) return so;
-      return b.agents[0].lastActivityAt - a.agents[0].lastActivityAt;
+      return so !== 0 ? so : b.agents[0].lastActivityAt - a.agents[0].lastActivityAt;
     });
     return result;
   }, [agents]);
 
   const totalAgents = agents.length;
-  const totalSubs = agents.reduce(
-    (acc, a) => acc + a.subAgents.filter((s) => !s.finished).length,
-    0
-  );
+  const totalSubs = agents.reduce((acc, a) => acc + a.subAgents.filter((s) => !s.finished).length, 0);
 
-  function handleSpawned(session: { ptyId: string; cwd: string; spawnedAt: number }) {
-    // Update recent cwds (deduplicated, most recent first, capped at 10).
-    setRecentCwds((prev) => {
-      const next = [session.cwd, ...prev.filter((c) => c !== session.cwd)].slice(0, 10);
-      saveRecentCwds(next);
-      return next;
-    });
-    // Open the terminal overlay for the newly spawned session.
-    setActivePty({ ptyId: session.ptyId, cwd: session.cwd });
-  }
-
+  // ── Collapsed sidebar ─────────────────────────────────────────────────────
   if (collapsed) {
     return (
       <>
         <aside id="agent-sidebar" className="collapsed">
-          <button
-            className="collapse-btn"
-            onClick={onToggle}
-            title="Show agents"
-          >
-            ←
-          </button>
+          <button className="collapse-btn" onClick={onToggle} title="Show agents">←</button>
           <span className={`dot ${connected ? "ok" : "ko"}`} />
           <span className="count-vert">{totalAgents}</span>
         </aside>
-
-        {activePty && (
-          <TerminalOverlay
-            ptyId={activePty.ptyId}
-            cwd={activePty.cwd}
-            onClose={() => setActivePty(null)}
-          />
-        )}
+        {renderTerminals()}
       </>
     );
   }
 
+  // ── Expanded sidebar ──────────────────────────────────────────────────────
   return (
     <>
       <aside id="agent-sidebar">
@@ -166,35 +171,42 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
           <span className={`dot ${connected ? "ok" : "ko"}`} />
           <h2>Live Claude sessions</h2>
           <span className="count">
-            {totalAgents}
-            {totalSubs > 0 ? ` · ${totalSubs} sub` : ""}
+            {totalAgents}{totalSubs > 0 ? ` · ${totalSubs} sub` : ""}
           </span>
           <button
             className="spawn-btn-header"
-            onClick={() => setShowSpawnPanel(true)}
+            onClick={() => { setSpawnDefaultCwd(""); setShowSpawnPanel(true); }}
             title="Launch a new Claude session"
           >
             ⚡
           </button>
-          <button
-            className="collapse-btn"
-            onClick={onToggle}
-            title="Collapse"
-          >
-            →
-          </button>
+          <button className="collapse-btn" onClick={onToggle} title="Collapse">→</button>
         </header>
+
         <div className="groups">
           {groups.length === 0 ? (
-            <p className="empty">No active session in the last 30 minutes.<br /><button className="empty-spawn-btn" onClick={() => setShowSpawnPanel(true)}>⚡ Launch Claude</button></p>
+            <div className="empty">
+              <span>No active session.</span>
+              <button className="empty-spawn-btn" onClick={() => { setSpawnDefaultCwd(""); setShowSpawnPanel(true); }}>
+                ⚡ Launch Claude
+              </button>
+            </div>
           ) : (
             groups.map((g) => (
               <section key={g.cwd} className="project">
                 <h3 title={g.cwd}>{shortName(g.cwd)}</h3>
                 <ul>
-                  {g.agents.map((a) => (
-                    <AgentRow key={a.sessionId} agent={a} />
-                  ))}
+                  {g.agents.map((a) => {
+                    const pty = ptySessions.find((p) => p.cwd === a.cwd);
+                    return (
+                      <AgentRow
+                        key={a.sessionId}
+                        agent={a}
+                        pty={pty}
+                        onClick={() => handleAgentClick(a)}
+                      />
+                    );
+                  })}
                 </ul>
               </section>
             ))
@@ -205,39 +217,56 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
       {showSpawnPanel && (
         <SpawnPanel
           recentCwds={recentCwds}
+          defaultCwd={spawnDefaultCwd || undefined}
           onClose={() => setShowSpawnPanel(false)}
-          onSpawned={(session) => {
-            setShowSpawnPanel(false);
-            handleSpawned(session);
-          }}
+          onSpawned={(session) => { setShowSpawnPanel(false); handleSpawned(session); }}
         />
       )}
 
-      {activePty && (
-        <TerminalOverlay
-          ptyId={activePty.ptyId}
-          cwd={activePty.cwd}
-          onClose={() => setActivePty(null)}
-        />
-      )}
+      {renderTerminals()}
     </>
   );
+
+  // ── Floating terminal windows (non-minimized only) ─────────────────────
+  function renderTerminals() {
+    return ptySessions
+      .filter((p) => !p.minimized)
+      .map((p) => (
+        <TerminalOverlay
+          key={p.ptyId}
+          ptyId={p.ptyId}
+          cwd={p.cwd}
+          onMinimize={() => minimizeTerminal(p.ptyId)}
+          onClose={() => closeTerminal(p.ptyId)}
+        />
+      ));
+  }
 }
 
-function AgentRow({ agent }: { agent: AgentState }) {
+// ── AgentRow ────────────────────────────────────────────────────────────────
+function AgentRow({
+  agent,
+  pty,
+  onClick,
+}: {
+  agent: AgentState;
+  pty?: ActivePty;
+  onClick: () => void;
+}) {
   const liveSubs = agent.subAgents.filter((s) => !s.finished);
+  const title = pty
+    ? pty.minimized ? "Restore terminal" : "Terminal open — click to bring up"
+    : "Launch terminal for this agent";
+
   return (
     <li className="agent">
       <div
         className="agent-head"
         role="button"
         tabIndex={0}
-        onClick={() => uiBus.emit("highlight_agent", { id: agent.sessionId })}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ")
-            uiBus.emit("highlight_agent", { id: agent.sessionId });
-        }}
-        title="Focus this agent on the map"
+        onClick={onClick}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
+        title={title}
       >
         <span className="icon teacher" style={spriteStyle(teacherSpriteFor(agent.sessionId))} />
         <div className="meta">
@@ -247,50 +276,54 @@ function AgentRow({ agent }: { agent: AgentState }) {
             {agent.currentTool ? <span className="tool"> · {agent.currentTool}</span> : null}
           </div>
           {agent.currentToolDetail ? (
-            <div className="detail" title={agent.currentToolDetail}>
-              {agent.currentToolDetail}
-            </div>
+            <div className="detail" title={agent.currentToolDetail}>{agent.currentToolDetail}</div>
           ) : null}
         </div>
+        {/* Terminal badge — shows when a PTY is attached to this agent */}
+        {pty && (
+          <span
+            className={`terminal-badge ${pty.minimized ? "minimized" : "active"}`}
+            title={pty.minimized ? "Terminal minimized — click to restore" : "Terminal open"}
+          >
+            &gt;_
+          </span>
+        )}
       </div>
-      {liveSubs.length > 0 ? (
+      {liveSubs.length > 0 && (
         <ul className="subs">
-          {liveSubs.map((s) => (
-            <SubAgentRow key={s.id} sub={s} />
-          ))}
+          {liveSubs.map((s) => <SubAgentRow key={s.id} sub={s} />)}
         </ul>
-      ) : null}
+      )}
     </li>
   );
 }
 
+// ── SubAgentRow ─────────────────────────────────────────────────────────────
 function SubAgentRow({ sub }: { sub: SubAgentState }) {
   return (
-    <li
-      className="sub-agent"
-      role="button"
-      tabIndex={0}
-      onClick={() => uiBus.emit("highlight_agent", { id: sub.id })}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ")
-          uiBus.emit("highlight_agent", { id: sub.id });
-      }}
-      title="Focus this sub-agent on the map"
-    >
-      <span className="icon student" style={spriteStyle(studentSpriteFor(sub.id))} />
+    <li className="sub-agent" tabIndex={0}>
+      <span
+        className="icon student"
+        style={{
+          backgroundImage: `url(/assets/sprites/${studentSpriteFor(sub.id)}.png)`,
+          backgroundPosition: "-24px 0px",
+          backgroundSize: "72px 96px",
+          width: 24,
+          height: 24,
+          imageRendering: "pixelated",
+          flex: "0 0 24px",
+          backgroundRepeat: "no-repeat",
+        }}
+      />
       <div className="meta">
-        <div className="name" title={sub.description}>
-          {sub.description || "Sub-task"}
-        </div>
+        <div className="name" title={sub.description}>{sub.description || "Sub-task"}</div>
         <div className="line">
           <span className="status-dot" style={{ background: STATUS_COLOR[sub.status] }} />
           <span className="status">{STATUS_LABEL[sub.status]}</span>
           {sub.currentTool ? <span className="tool"> · {sub.currentTool}</span> : null}
         </div>
         {sub.currentToolDetail ? (
-          <div className="detail" title={sub.currentToolDetail}>
-            {sub.currentToolDetail}
-          </div>
+          <div className="detail" title={sub.currentToolDetail}>{sub.currentToolDetail}</div>
         ) : null}
       </div>
     </li>

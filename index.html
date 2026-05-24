@@ -79,22 +79,28 @@
       #spawn-panel .spawn-btn:disabled { opacity: 0.45; cursor: not-allowed; }
       #spawn-panel .close-btn { background: transparent; border: none; color: #888; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 3px; line-height: 1; }
       #spawn-panel .close-btn:hover { color: #eee; }
-      /* ── TerminalOverlay (xterm.js) ───────────────────────────────────── */
-      #terminal-overlay { position: fixed; bottom: 0; right: 0; width: max(var(--sidebar-w), 540px); height: 60vh; z-index: 30; display: flex; flex-direction: column; pointer-events: none; }
-      #terminal-panel { pointer-events: all; display: flex; flex-direction: column; height: 100%; background: #0d1117; border: 1px solid #2c313a; border-bottom: none; border-radius: 8px 8px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.5); overflow: hidden; }
-      #terminal-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #111418; border-bottom: 1px solid #1d2128; flex: 0 0 auto; }
+      /* ── TerminalOverlay — centered floating window in the map area ─── */
+      #terminal-overlay { position: fixed; top: 0; left: 0; right: var(--sidebar-w); bottom: 0; z-index: 30; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+      #terminal-panel { pointer-events: all; display: flex; flex-direction: column; width: min(84vw, 960px); height: 68vh; background: #0d1117; border: 1px solid #3b3f4a; border-radius: 10px; box-shadow: 0 24px 80px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04); overflow: hidden; }
+      #terminal-header { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: #111418; border-bottom: 1px solid #1d2128; flex: 0 0 auto; }
       #terminal-header .term-title { font-size: 13px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      #terminal-header .term-pty-id { font-size: 10px; font-family: ui-monospace, monospace; opacity: 0.4; }
-      #terminal-header .close-btn { background: transparent; border: none; color: #888; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 3px; line-height: 1; }
-      #terminal-header .close-btn:hover { color: #eee; }
+      #terminal-header .term-pty-id { font-size: 10px; font-family: ui-monospace, monospace; opacity: 0.35; }
       #terminal-header .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
       #terminal-header .dot.ok { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
       #terminal-header .dot.ko { background: #ef4444; }
-      /* xterm.js container — fills the remaining panel height */
-      #terminal-xterm { flex: 1; overflow: hidden; padding: 4px; }
+      .term-controls { display: flex; gap: 4px; }
+      .term-btn { background: transparent; border: 1px solid #2c313a; color: #888; cursor: pointer; width: 22px; height: 22px; border-radius: 4px; font-size: 13px; line-height: 1; padding: 0; display: flex; align-items: center; justify-content: center; }
+      .term-btn:hover { background: #1e2430; color: #eee; border-color: #444; }
+      .minimize-btn { font-size: 16px; padding-bottom: 3px; }
+      /* xterm.js container */
+      #terminal-xterm { flex: 1; overflow: hidden; padding: 6px; }
       #terminal-xterm .xterm { height: 100%; }
       #terminal-xterm .xterm-viewport { overflow-y: auto !important; }
       #terminal-xterm .xterm-screen { height: 100%; }
+      /* ── Terminal badge in agent rows ─────────────────────────────────── */
+      .terminal-badge { font-family: ui-monospace, monospace; font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; flex-shrink: 0; letter-spacing: -0.02em; }
+      .terminal-badge.active { background: rgba(99, 102, 241, 0.2); border: 1px solid #6366f1; color: #a5b4fc; }
+      .terminal-badge.minimized { background: rgba(55, 65, 81, 0.4); border: 1px solid #374151; color: #6b7280; }
     </style>
   </head>
   <body>

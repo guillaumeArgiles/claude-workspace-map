@@ -8,12 +8,14 @@ interface SpawnedSession {
 
 interface SpawnPanelProps {
   recentCwds: string[];
+  /** Pre-fills the cwd input (e.g. when launching from an existing agent row). */
+  defaultCwd?: string;
   onClose: () => void;
   onSpawned: (session: SpawnedSession) => void;
 }
 
-export function SpawnPanel({ recentCwds, onClose, onSpawned }: SpawnPanelProps) {
-  const [cwd, setCwd] = useState(recentCwds[0] ?? "");
+export function SpawnPanel({ recentCwds, defaultCwd, onClose, onSpawned }: SpawnPanelProps) {
+  const [cwd, setCwd] = useState(defaultCwd ?? recentCwds[0] ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
