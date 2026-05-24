@@ -16,10 +16,9 @@ files:
   - package.json
 
 # GitHub Releases — used by electron-updater to fetch update manifests
-# Replace <owner> and <repo> before the first release tag push
 publish:
   provider: github
-  owner: <owner>
+  owner: guillaumeArgiles
   repo: claude-workspace-map
 
 # macOS (notarisation deferred to S7.4 — needs Apple Developer ID)

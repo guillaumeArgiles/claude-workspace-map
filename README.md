@@ -48,7 +48,7 @@ Open the app. It starts the server automatically on `localhost:4000` and watches
 ### Option B — From source
 
 ```bash
-git clone https://github.com/<owner>/claude-workspace-map.git
+git clone https://github.com/guillaumeArgiles/claude-workspace-map.git
 cd claude-workspace-map
 npm install
 
