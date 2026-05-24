@@ -108,10 +108,17 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize, onRespawn }: 
       try {
         const { chunk } = JSON.parse(e.data) as { chunk: string };
         term.write(chunk);
-        // Detect Claude Code crash (bug in v2.1.x: originalFile null on resume)
-        if (isCrashOutput(chunk)) setCrashed(true);
         // Detect process exit sentinel written by pty-manager
         if (chunk.includes("[session ended]")) setSessionEnded(true);
+        // Detect Claude Code crash (bug in v2.1.x: originalFile null on resume).
+        // Claude prints the stack trace but does NOT exit — auto-kill after 1.5s
+        // so the session ends cleanly and the recovery banner appears.
+        if (isCrashOutput(chunk)) {
+          setCrashed(true);
+          setTimeout(() => {
+            fetch(`/api/sessions/${ptyId}`, { method: "DELETE" }).catch(() => {});
+          }, 1500);
+        }
       } catch { /* ignore */ }
     };
 

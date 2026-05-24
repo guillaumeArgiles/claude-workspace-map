@@ -115,9 +115,17 @@ export async function startServer(
         res.writeHead(201, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ptyId }));
       } catch (err) {
-        log.warn({ err }, "POST /api/sessions error");
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: String(err) }));
+        const msg = String(err);
+        // Detect PTY exhaustion (macOS kern.tty.ptmx_max hit — usually caused by a
+        // PTY file-descriptor leak in Claude Code holding all 511 slots).
+        const isPtyExhausted = msg.includes("posix_spawnp") || msg.includes("out of pty");
+        log.warn({ err, isPtyExhausted }, "POST /api/sessions error");
+        res.writeHead(isPtyExhausted ? 503 : 400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          error: isPtyExhausted
+            ? "System PTY limit reached (kern.tty.ptmx_max=511). Restart the Claude app to free leaked PTY file descriptors."
+            : msg,
+        }));
       }
       return;
     }

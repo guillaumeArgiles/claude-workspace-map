@@ -91,10 +91,17 @@ export class PtyManager {
     pty.onExit(({ exitCode }) => {
       session.exitCode = exitCode;
       log.info({ ptyId: id, exitCode }, "PTY exited");
-      // Notify listeners the stream ended.
+      // Append the sentinel to the ring buffer so clients that connect *after*
+      // the process exits (e.g. fast-crashing claude --continue) still see it.
+      const sentinel = "\r\n[session ended]\r\n";
+      session.outputBuffer += sentinel;
+      if (session.outputBuffer.length > OUTPUT_RING_SIZE) {
+        session.outputBuffer = session.outputBuffer.slice(-OUTPUT_RING_SIZE);
+      }
+      // Notify already-connected listeners.
       for (const fn of session.listeners) {
         try {
-          fn("\r\n[session ended]\r\n");
+          fn(sentinel);
         } catch {
           /* ignore */
         }

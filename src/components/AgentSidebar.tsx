@@ -128,6 +128,8 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
 
   function closeTerminal(ptyId: string) {
     setPtySessions((prev) => prev.filter((p) => p.ptyId !== ptyId));
+    // Kill the underlying PTY process (no-op if already dead).
+    fetch(`/api/sessions/${ptyId}`, { method: "DELETE" }).catch(() => {});
   }
 
   /**

@@ -29,12 +29,12 @@ export function SpawnPanel({ recentCwds, defaultCwd, onClose, onSpawned }: Spawn
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cwd: cwd.trim() }),
       });
-      if (!res.ok) throw new Error(await res.text());
-      const { ptyId } = (await res.json()) as { ptyId: string };
-      onSpawned({ ptyId, cwd: cwd.trim(), spawnedAt: Date.now() });
+      const json = await res.json() as { ptyId?: string; error?: string };
+      if (!res.ok) throw new Error(json.error ?? res.statusText);
+      onSpawned({ ptyId: json.ptyId!, cwd: cwd.trim(), spawnedAt: Date.now() });
       onClose();
     } catch (err) {
-      setError(String(err));
+      setError(String(err).replace(/^Error:\s*/, ""));
     } finally {
       setLoading(false);
     }
