@@ -57,6 +57,8 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   const [showSpawnPanel, setShowSpawnPanel] = useState(false);
   const [spawnDefaultCwd, setSpawnDefaultCwd] = useState("");
   const [recentCwds, setRecentCwds] = useState<string[]>(loadRecentCwds);
+  /** sessionId being resumed right now (shows spinner in that row). */
+  const [resumingId, setResumingId] = useState<string | null>(null);
 
   // ── SSE subscription ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -112,15 +114,43 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
     setPtySessions((prev) => prev.filter((p) => p.ptyId !== ptyId));
   }
 
-  /** Called when user clicks an agent row — open its terminal or spawn one. */
+  /**
+   * Resume an existing agent session in a new PTY.
+   * Uses `claude --resume <sessionId>` so Claude Code loads the full
+   * conversation history for that session — effectively "re-opening"
+   * the Claude Code TUI for it.
+   */
+  async function resumeSession(agent: AgentState) {
+    if (resumingId) return; // debounce
+    setResumingId(agent.sessionId);
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cwd: agent.cwd,
+          command: `claude --resume ${agent.sessionId}`,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { ptyId } = (await res.json()) as { ptyId: string };
+      handleSpawned({ ptyId, cwd: agent.cwd, spawnedAt: Date.now() });
+    } catch (err) {
+      console.error("Failed to resume session:", err);
+    } finally {
+      setResumingId(null);
+    }
+  }
+
+  /** Called when user clicks an agent row. */
   function handleAgentClick(agent: AgentState) {
     const pty = ptySessions.find((p) => p.cwd === agent.cwd);
     if (pty) {
+      // Already have a terminal open for this cwd — restore it
       restoreTerminal(pty.ptyId);
     } else {
-      // No running terminal for this agent → open SpawnPanel pre-filled
-      setSpawnDefaultCwd(agent.cwd);
-      setShowSpawnPanel(true);
+      // Resume the existing Claude session via `claude --resume <sessionId>`
+      void resumeSession(agent);
     }
   }
 
@@ -203,6 +233,7 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
                         key={a.sessionId}
                         agent={a}
                         pty={pty}
+                        resuming={resumingId === a.sessionId}
                         onClick={() => handleAgentClick(a)}
                       />
                     );
@@ -247,26 +278,32 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
 function AgentRow({
   agent,
   pty,
+  resuming,
   onClick,
 }: {
   agent: AgentState;
   pty?: ActivePty;
+  resuming: boolean;
   onClick: () => void;
 }) {
   const liveSubs = agent.subAgents.filter((s) => !s.finished);
-  const title = pty
-    ? pty.minimized ? "Restore terminal" : "Terminal open — click to bring up"
-    : "Launch terminal for this agent";
+
+  let title: string;
+  if (resuming)          title = "Opening Claude Code…";
+  else if (pty?.minimized) title = "Restore terminal";
+  else if (pty)          title = "Terminal open — click to bring up";
+  else                   title = `Resume this session in Claude Code (${agent.sessionId.slice(0, 8)}…)`;
 
   return (
     <li className="agent">
       <div
-        className="agent-head"
+        className={`agent-head ${resuming ? "resuming" : ""}`}
         role="button"
         tabIndex={0}
-        onClick={onClick}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
+        onClick={resuming ? undefined : onClick}
+        onKeyDown={(e) => { if (!resuming && (e.key === "Enter" || e.key === " ")) onClick(); }}
         title={title}
+        aria-busy={resuming}
       >
         <span className="icon teacher" style={spriteStyle(teacherSpriteFor(agent.sessionId))} />
         <div className="meta">
@@ -279,14 +316,18 @@ function AgentRow({
             <div className="detail" title={agent.currentToolDetail}>{agent.currentToolDetail}</div>
           ) : null}
         </div>
-        {/* Terminal badge — shows when a PTY is attached to this agent */}
-        {pty && (
+        {/* Badge: spinner while resuming, >_ badge when PTY is attached */}
+        {resuming ? (
+          <span className="terminal-badge resuming-badge" title="Launching…">···</span>
+        ) : pty ? (
           <span
             className={`terminal-badge ${pty.minimized ? "minimized" : "active"}`}
             title={pty.minimized ? "Terminal minimized — click to restore" : "Terminal open"}
           >
             &gt;_
           </span>
+        ) : (
+          <span className="terminal-badge resume-hint" title={title}>▶</span>
         )}
       </div>
       {liveSubs.length > 0 && (

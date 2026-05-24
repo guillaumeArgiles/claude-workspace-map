@@ -101,6 +101,13 @@
       .terminal-badge { font-family: ui-monospace, monospace; font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; flex-shrink: 0; letter-spacing: -0.02em; }
       .terminal-badge.active { background: rgba(99, 102, 241, 0.2); border: 1px solid #6366f1; color: #a5b4fc; }
       .terminal-badge.minimized { background: rgba(55, 65, 81, 0.4); border: 1px solid #374151; color: #6b7280; }
+      /* ▶ hint shown on agents without a running terminal */
+      .terminal-badge.resume-hint { background: transparent; border: 1px solid #2c313a; color: #4b5563; font-size: 8px; opacity: 0; transition: opacity 0.12s; }
+      #agent-sidebar .agent-head:hover .resume-hint { opacity: 1; }
+      /* ··· spinner shown while launching */
+      .terminal-badge.resuming-badge { background: rgba(251,191,36,0.15); border: 1px solid #d97706; color: #fbbf24; letter-spacing: 0.1em; animation: badge-pulse 0.9s ease-in-out infinite; }
+      @keyframes badge-pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
+      #agent-sidebar .agent-head.resuming { cursor: wait; opacity: 0.75; }
     </style>
   </head>
   <body>
