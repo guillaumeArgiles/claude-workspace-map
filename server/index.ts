@@ -207,6 +207,23 @@ export async function startServer(
       return;
     }
 
+    // DELETE /api/agents/:sessionId — dismiss one agent from the sidebar
+    const agentDeleteMatch = url.match(/^\/api\/agents\/([^/]+)$/);
+    if (req.method === "DELETE" && agentDeleteMatch) {
+      watcher.dismiss(agentDeleteMatch[1]);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    // DELETE /api/agents — bulk dismiss done/idle agents
+    if (req.method === "DELETE" && url === "/api/agents") {
+      watcher.dismissWhere((a) => a.status === "done" || a.status === "idle");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
     // DELETE /api/sessions/:ptyId — kill a PTY
     const deleteMatch = url.match(/^\/api\/sessions\/([^/]+)$/);
     if (req.method === "DELETE" && deleteMatch) {

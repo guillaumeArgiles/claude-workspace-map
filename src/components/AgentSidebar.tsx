@@ -181,6 +181,16 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   // Keep the ref fresh so notification onclick always calls the current version.
   agentClickRef.current = handleAgentClick;
 
+  /** Dismiss a single agent (hide until it has new activity). */
+  function dismissAgent(sessionId: string) {
+    fetch(`/api/agents/${sessionId}`, { method: "DELETE" }).catch(() => {});
+  }
+
+  /** Dismiss all done/idle agents in one shot. */
+  function dismissAllInactive() {
+    fetch("/api/agents", { method: "DELETE" }).catch(() => {});
+  }
+
   // ── Notification helpers ──────────────────────────────────────────────────
 
   /** Request browser notification permission and update state. */
@@ -257,6 +267,7 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
 
   const totalAgents = agents.length;
   const totalSubs = agents.reduce((acc, a) => acc + a.subAgents.filter((s) => !s.finished).length, 0);
+  const inactiveCount = agents.filter((a) => a.status === "done" || a.status === "idle").length;
 
   // ── Collapsed sidebar ─────────────────────────────────────────────────────
   if (collapsed) {
@@ -289,6 +300,15 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
           >
             ⚡
           </button>
+          {inactiveCount > 0 && (
+            <button
+              className="clear-btn-header"
+              onClick={dismissAllInactive}
+              title={`Clear ${inactiveCount} done/idle agent${inactiveCount > 1 ? "s" : ""}`}
+            >
+              🧹
+            </button>
+          )}
           {"Notification" in window && (
             <button
               className={`notif-btn ${notifPermission === "granted" ? "active" : ""}`}
@@ -329,6 +349,7 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
                         pty={pty}
                         resuming={resumingId === a.sessionId}
                         onClick={() => handleAgentClick(a)}
+                        onDismiss={() => dismissAgent(a.sessionId)}
                       />
                     );
                   })}
@@ -375,11 +396,13 @@ function AgentRow({
   pty,
   resuming,
   onClick,
+  onDismiss,
 }: {
   agent: AgentState;
   pty?: ActivePty;
   resuming: boolean;
   onClick: () => void;
+  onDismiss: () => void;
 }) {
   const liveSubs = agent.subAgents.filter((s) => !s.finished);
 
@@ -430,6 +453,14 @@ function AgentRow({
         ) : (
           <span className="terminal-badge resume-hint" title={termTitle}>▶</span>
         )}
+        {/* Dismiss button — visible on hover */}
+        <button
+          className="dismiss-btn"
+          title="Dismiss agent"
+          onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+        >
+          ×
+        </button>
       </div>
 
       {/* Inline approval widget — shown when ExitPlanMode or AskUserQuestion is pending */}

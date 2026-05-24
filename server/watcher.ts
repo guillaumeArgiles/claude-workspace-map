@@ -34,6 +34,12 @@ export interface WatcherEvents {
 export class SessionWatcher {
   private trackers = new Map<string, SessionTracker>();
   private watcher?: FSWatcher;
+  /**
+   * Sessions dismissed by the user: sessionId → byteOffset at dismissal time.
+   * A dismissed session is re-shown only if its JSONL file grows beyond that
+   * offset (new activity from a resumed agent).
+   */
+  private dismissed = new Map<string, number>();
 
   constructor(private events: WatcherEvents) {}
 
@@ -98,6 +104,35 @@ export class SessionWatcher {
 
     if (changed && this.isActive(tracker.agent)) {
       this.events.onUpdate(tracker.agent);
+    }
+  }
+
+  /**
+   * Hide an agent from the sidebar. The tracker is removed immediately and
+   * `onRemove` is fired. If the agent's JSONL file grows later (new activity),
+   * it will be re-added automatically.
+   */
+  dismiss(sessionId: string): void {
+    for (const [filePath, tracker] of this.trackers) {
+      if (tracker.agent.sessionId === sessionId) {
+        this.dismissed.set(sessionId, tracker.byteOffset);
+        this.trackers.delete(filePath);
+        this.events.onRemove(sessionId);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Dismiss all agents matching `predicate`. Useful for bulk-clearing done/idle sessions.
+   */
+  dismissWhere(predicate: (agent: AgentState) => boolean): void {
+    for (const [filePath, tracker] of this.trackers) {
+      if (predicate(tracker.agent)) {
+        this.dismissed.set(tracker.agent.sessionId, tracker.byteOffset);
+        this.trackers.delete(filePath);
+        this.events.onRemove(tracker.agent.sessionId);
+      }
     }
   }
 
@@ -173,6 +208,15 @@ export class SessionWatcher {
   }
 
   private async handleAddOrChange(filePath: string): Promise<void> {
+    // If the user dismissed this session, only re-show it when new content arrives.
+    const sessionId = path.basename(filePath, ".jsonl");
+    const dismissedOffset = this.dismissed.get(sessionId);
+    if (dismissedOffset !== undefined) {
+      const peekStats = await fs.stat(filePath).catch(() => null);
+      if (!peekStats || peekStats.size <= dismissedOffset) return; // no new content
+      this.dismissed.delete(sessionId); // new activity — un-dismiss
+    }
+
     const existed = this.trackers.has(filePath);
     const tracker = this.getOrCreate(filePath);
     const wasActiveBefore = existed && this.isActive(tracker.agent);
