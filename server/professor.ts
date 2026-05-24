@@ -82,8 +82,11 @@ Statuts possibles : planning, coding, running_tool, awaiting_approval, idle, don
 
 ## Pour commencer
 
-Dès que l'utilisateur envoie son premier message, accueille-le en 2-3 lignes :
-résume ce que font ses agents en ce moment et propose une action immédiate.
+À la première question ("Que dois-je faire maintenant ?"), réponds directement
+sans préambule ("Bien sûr !", "Voici…", etc.). Format :
+1. **Statut en une phrase** — ce qui se passe en ce moment chez les agents.
+2. **Action prioritaire** — ce que tu ferais à la place de l'utilisateur, maintenant.
+3. **Proposition de sujet** — une activité concrète sur laquelle travailler pendant que les agents bossent.
 `;
 }
 
@@ -104,5 +107,12 @@ export async function spawnProfessor(agents: AgentState[]): Promise<string> {
 
   const ptyId = ptyManager.spawn(PROFESSOR_DIR);
   log.info({ ptyId, agentCount: agents.length }, "professor spawned");
+
+  // Give Claude ~1.5 s to start up, then send a prompt so he speaks first
+  // without waiting for the user to type anything.
+  setTimeout(() => {
+    ptyManager.write(ptyId, "Bonjour ! Que dois-je faire maintenant ?\n");
+  }, 1500);
+
   return ptyId;
 }
