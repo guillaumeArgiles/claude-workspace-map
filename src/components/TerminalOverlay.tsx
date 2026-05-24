@@ -62,6 +62,22 @@ export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
     termRef.current = term;
     fitRef.current = fit;
 
+    // ── Key event isolation ─────────────────────────────────────────────
+    // Phaser's KeyboardPlugin listens on `window` and calls preventDefault()
+    // on captured keys (space, arrows…). xterm.js checks defaultPrevented
+    // before processing, so those keys silently vanish.
+    // Fix: intercept every keydown/keyup on the xterm canvas before the event
+    // bubbles up to Phaser, and stop propagation there.
+    // We let Escape through (return false = xterm ignores it) so the overlay
+    // div's own handler can close the panel.
+    term.attachCustomKeyEventHandler((ev) => {
+      ev.stopPropagation(); // never reaches Phaser's window listener
+      if (ev.key === "Escape" && ev.type === "keydown") {
+        return false;       // xterm ignores Escape → overlay div catches it
+      }
+      return true;          // xterm handles everything else normally
+    });
+
     // ── Send initial dimensions to PTY ──────────────────────────────────
     const syncSize = () => {
       fit.fit();
@@ -116,7 +132,8 @@ export function TerminalOverlay({ ptyId, cwd, onClose }: TerminalOverlayProps) {
   }, [ptyId]);
 
   return (
-    <div id="terminal-overlay">
+    // onKeyDown catches Escape that xterm let through (returned false above)
+    <div id="terminal-overlay" onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}>
       <div id="terminal-panel">
         <header id="terminal-header">
           <span className="term-title" title={cwd}>
