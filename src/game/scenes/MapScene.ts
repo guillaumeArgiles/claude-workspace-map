@@ -117,6 +117,18 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.setZoom(CAMERA_ZOOM);
     this.cameras.main.startFollow(player, true, 0.12, 0.12);
 
+    // Re-clamp camera bounds whenever the canvas is resized (sidebar toggle,
+    // window resize). Without this call the camera can drift outside the map
+    // after a resize event in RESIZE scale mode.
+    this.scale.on(
+      Phaser.Scale.Events.RESIZE,
+      () => {
+        this.cameras.main.setBounds(0, 0, GRID.width, GRID.height);
+        this.cameras.main.setZoom(CAMERA_ZOOM);
+      },
+      this
+    );
+
     // NPCs collide with everything.
     this.npcManager.init({ player, obstacles: this.collision.obstacles });
 

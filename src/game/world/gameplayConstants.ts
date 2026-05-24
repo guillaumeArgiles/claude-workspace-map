@@ -5,8 +5,8 @@
 
 // --- Player ---
 /** Width/height of the programmatic placeholder sprite (px, native). */
-export const PLAYER_W = 24;
-export const PLAYER_H = 32;
+export const PLAYER_W = 18;
+export const PLAYER_H = 24;
 /** Movement speed in pixels per second. */
 export const PLAYER_SPEED = 220;
 
@@ -23,14 +23,17 @@ export const NPC_REACH_DIST = 6;
 export const NPC_STUCK_TIMEOUT = 400;
 
 // --- Sprite rendering ---
-/** Final on-screen height (px) for any character with a real sprite. */
-export const TARGET_CHAR_HEIGHT = 64;
+/** Final on-screen height (px) for any character with a real sprite.
+ *  48 px = 2/3 of one 72-px cell — characters feel human-scaled and leave
+ *  clear walking room in single-cell corridors.
+ */
+export const TARGET_CHAR_HEIGHT = 48;
 /**
  * Native texture height (px) after downsample. Smaller than the displayed
  * size on purpose: Phaser scales it back up with nearest-neighbour, giving
  * visible chunky pixels that match the map's pixel art density.
  */
-export const TARGET_NATIVE_HEIGHT = 32;
+export const TARGET_NATIVE_HEIGHT = 24;
 
 // --- Hitbox / collisions ---
 /** Hitbox fraction of the sprite: centred horizontally, anchored at feet. */

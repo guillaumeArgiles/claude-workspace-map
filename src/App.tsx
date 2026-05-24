@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import Phaser from "phaser";
-import { GRID } from "./game/config/grid";
 import { MapScene } from "./game/scenes/MapScene";
 import { AgentSidebar } from "./components/AgentSidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -16,8 +15,9 @@ export function App() {
     const game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: mountRef.current,
-      width: GRID.width,
-      height: GRID.height,
+      // width/height omitted — RESIZE mode fills the parent container exactly,
+      // so the canvas never overflows and map edges are always reachable by
+      // scrolling the camera to the bounds.
       backgroundColor: "#1a1a1a",
       pixelArt: true,
       roundPixels: true,
@@ -26,11 +26,9 @@ export function App() {
         arcade: { debug: false },
       },
       scale: {
-        // ENVELOP scales the canvas so the *smaller* dimension fills the
-        // container and the larger one overflows — combined with camera bounds
-        // we never see dark letterbox bars; we just crop a little of the map
-        // when the viewport aspect doesn't match 5:3.
-        mode: Phaser.Scale.ENVELOP,
+        // RESIZE: canvas = container size, no scaling, no overflow.
+        // Camera zoom + setBounds (in MapScene) handle what's visible.
+        mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH,
       },
       scene: [MapScene],
