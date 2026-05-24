@@ -4,7 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { parseLine, applyToAgentStatus, subAgentChanges, toolDetail, lastToolUse } from "./parser.js";
 import { child } from "./logger.js";
-import type { AgentState, SubAgentState } from "../shared/agent-types.js";
+import type { AgentState, SubAgentState, PendingQuestion } from "../shared/agent-types.js";
 
 const log = child("watcher");
 
@@ -20,6 +20,9 @@ interface SessionTracker {
   subByToolUseId: Map<string, number>;
   /** Partial line at the tail of the file (when a write splits a line). */
   pending: string;
+  /** tool_use_id of the last ExitPlanMode or AskUserQuestion call — cleared when
+   *  the corresponding tool_result arrives so the approval widget disappears. */
+  pendingApprovalToolId?: string;
 }
 
 export interface WatcherEvents {
@@ -276,6 +279,34 @@ export class SessionWatcher {
         tracker.agent.currentToolDetail = toolDetail(tu.name, tu.input);
       } else if (!next.currentTool) {
         tracker.agent.currentToolDetail = undefined;
+      }
+
+      // ── Pending approval data ─────────────────────────────────────────────
+      // Populate pendingPlan / pendingQuestions when ExitPlanMode or
+      // AskUserQuestion fires; clear them once the tool_result comes back
+      // (agent answered) or the turn ends.
+      if (tu?.name === "ExitPlanMode") {
+        const inp = tu.input as Record<string, unknown> | undefined;
+        tracker.agent.pendingPlan = inp?.plan ? String(inp.plan) : undefined;
+        tracker.agent.pendingQuestions = undefined;
+        tracker.pendingApprovalToolId = tu.toolUseId;
+      } else if (tu?.name === "AskUserQuestion") {
+        const inp = tu.input as Record<string, unknown> | undefined;
+        tracker.agent.pendingQuestions = inp?.questions as PendingQuestion[] | undefined;
+        tracker.agent.pendingPlan = undefined;
+        tracker.pendingApprovalToolId = tu.toolUseId;
+      } else if (
+        tracker.pendingApprovalToolId &&
+        parsed.toolResultIds.includes(tracker.pendingApprovalToolId)
+      ) {
+        // User replied — dismiss the widget immediately.
+        tracker.agent.pendingPlan = undefined;
+        tracker.agent.pendingQuestions = undefined;
+        tracker.pendingApprovalToolId = undefined;
+      } else if (next.turnEnded) {
+        tracker.agent.pendingPlan = undefined;
+        tracker.agent.pendingQuestions = undefined;
+        tracker.pendingApprovalToolId = undefined;
       }
     }
   }

@@ -3,6 +3,7 @@ import type {
   AgentState,
   ServerEvent,
   SubAgentState,
+  PendingQuestion,
 } from "../../shared/agent-types";
 import {
   teacherSpriteFor,
@@ -388,6 +389,9 @@ function AgentRow({
   else if (pty)            termTitle = "Terminal open — click to bring up";
   else                     termTitle = `Open in Claude Code (${agent.sessionId.slice(0, 8)}…)`;
 
+  const hasPending = agent.pendingPlan !== undefined ||
+    (agent.pendingQuestions && agent.pendingQuestions.length > 0);
+
   return (
     <li className="agent">
       <div
@@ -428,12 +432,100 @@ function AgentRow({
         )}
       </div>
 
+      {/* Inline approval widget — shown when ExitPlanMode or AskUserQuestion is pending */}
+      {hasPending && (
+        <PendingApprovalWidget agent={agent} onOpenTerminal={onClick} />
+      )}
+
       {liveSubs.length > 0 && (
         <ul className="subs">
           {liveSubs.map((s) => <SubAgentRow key={s.id} sub={s} />)}
         </ul>
       )}
     </li>
+  );
+}
+
+// ── PendingApprovalWidget ────────────────────────────────────────────────────
+/**
+ * Inline card rendered below an agent row when Claude is waiting for the
+ * user's input (ExitPlanMode → plan, AskUserQuestion → questions).
+ * Clicking "Open Terminal" opens the agent's Claude Code session so the user
+ * can type their response directly in the terminal.
+ */
+function PendingApprovalWidget({
+  agent,
+  onOpenTerminal,
+}: {
+  agent: AgentState;
+  onOpenTerminal: () => void;
+}) {
+  if (agent.pendingPlan) {
+    return <PlanWidget plan={agent.pendingPlan} onOpen={onOpenTerminal} />;
+  }
+  if (agent.pendingQuestions && agent.pendingQuestions.length > 0) {
+    return <QuestionsWidget questions={agent.pendingQuestions} onOpen={onOpenTerminal} />;
+  }
+  return null;
+}
+
+function PlanWidget({ plan, onOpen }: { plan: string; onOpen: () => void }) {
+  const lines = plan.split("\n").filter((l) => l.trim());
+  const title = (lines[0] ?? "Plan").replace(/^#+\s*/, "");
+  // Grab up to 3 body lines as a preview, skip further headings.
+  const bodyLines = lines.slice(1).filter((l) => !l.startsWith("#")).slice(0, 3);
+  const preview = bodyLines.join(" ").slice(0, 140);
+
+  return (
+    <div className="approval-widget">
+      <div className="approval-header">
+        <span className="approval-icon">📋</span>
+        <span className="approval-title">{title}</span>
+      </div>
+      {preview && <p className="approval-preview">{preview}{preview.length >= 140 ? "…" : ""}</p>}
+      <div className="approval-actions">
+        <button className="approval-btn" onClick={onOpen}>
+          Open Terminal to Approve
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function QuestionsWidget({
+  questions,
+  onOpen,
+}: {
+  questions: PendingQuestion[];
+  onOpen: () => void;
+}) {
+  const q = questions[0];
+  return (
+    <div className="approval-widget">
+      <div className="approval-header">
+        <span className="approval-icon">❓</span>
+        <span className="approval-title">{q.question}</span>
+      </div>
+      <ul className="approval-options">
+        {q.options.map((opt, i) => (
+          <li key={i} className="approval-option">
+            <span className="option-num">{i + 1}.</span>
+            <span className="option-label">{opt.label}</span>
+            {opt.description && (
+              <span className="option-desc">{opt.description}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {questions.length > 1 && (
+        <p className="approval-more">+{questions.length - 1} more question{questions.length > 2 ? "s" : ""}</p>
+      )}
+      <div className="approval-actions">
+        <button className="approval-btn" onClick={onOpen}>
+          Open Terminal to Answer
+        </button>
+      </div>
+    </div>
   );
 }
 

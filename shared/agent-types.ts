@@ -12,6 +12,20 @@ export type AgentStatus =
   | "done"
   | "blocked";
 
+/** One option in an AskUserQuestion question. */
+export interface QuestionOption {
+  label: string;
+  description?: string;
+}
+
+/** One question from an AskUserQuestion tool call. */
+export interface PendingQuestion {
+  question: string;
+  header?: string;
+  multiSelect?: boolean;
+  options: QuestionOption[];
+}
+
 export interface SubAgentState {
   /** Tool-use id of the parent `Task`/`Agent` call that spawned this subagent. */
   id: string;
@@ -47,6 +61,10 @@ export interface AgentState {
   /** True once a `stop_hook_summary` is seen and no newer tool_use after. */
   turnEnded: boolean;
   subAgents: SubAgentState[];
+  /** Populated when currentTool === 'ExitPlanMode'. Full plan markdown. */
+  pendingPlan?: string;
+  /** Populated when currentTool === 'AskUserQuestion'. Questions to display. */
+  pendingQuestions?: PendingQuestion[];
 }
 
 export type ServerEvent =
