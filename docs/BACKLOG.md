@@ -40,10 +40,10 @@ But : PoC → outil installable, stable, partageable.
 
 ### Sprint 3 — Packaging Electron
 
-- [ ] **S3.1** Bootstrap Electron + bundle Node server + Vite build
-- [ ] **S3.2** Auto-update (electron-updater + GitHub releases)
-- [ ] **S3.3** Icons + branding minimal (logo, splash)
-- [ ] **S3.4** Build matrice macOS Apple Silicon / macOS Intel / Linux x64
+- [x] **S3.1** Bootstrap Electron + bundle Node server + Vite build — livré. `electron/main.ts` + `electron/preload.ts`; `electron.vite.config.ts` (main 21 kB bundle, preload 0.25 kB, renderer 7 MB Phaser); `server/index.ts` exports `startServer(port)`, `server/start.ts` standalone entry; `npm run dev:electron` / `package:dir`; smoke tested: `/api/state` responds from embedded server.
+- [x] **S3.2** Auto-update (electron-updater + GitHub releases) — livré. `setupAutoUpdater()` en prod, silent download, dialog on ready, `quitAndInstall`; `.github/workflows/release.yml` déclenché sur tag `v*`; `electron-builder.yml` avec publish GitHub provider.
+- [x] **S3.3** Icons + branding minimal — livré. `build/icon.svg` pixel-art, `build/icon.icns` (macOS iconutil), `build/icon.png` (Linux); favicon 32px dans `public/`; titre "Claude Workspace Map" partout.
+- [x] **S3.4** Build matrice macOS Apple Silicon / macOS Intel / Linux x64 — livré. `release.yml` matrix `--arm64 --x64` sur `macos-latest`, `--x64` sur `ubuntu-latest`; `fail-fast: false`; packaged .app testé localement (284 MB).
 
 ### Sprint 4 — Onboarding + docs
 

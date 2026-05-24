@@ -140,21 +140,63 @@ Budget : 5j dev sur 10j calendaires. Marge confortable pour le dogfooding et les
 
 ---
 
-## Sprint 3 — Packaging Electron (à démarrer)
+## Sprint 3 — Packaging Electron (livré)
 
 **Phase** : 1 — Foundation Pro (final sprint avant Phase 2 Talk-to-Agents)
 **Goal** : sortir du `npm run dev` en parallèle. L'app devient un .dmg / .AppImage installable, hébergeant son propre Node server, qui auto-update.
 
-| ID | Story | Effort | Notes |
+| ID | Story | Effort | Statut |
 |---|---|---|---|
-| S3.1 | Bootstrap Electron + bundle Node server + Vite build | 2j | Le gros morceau : ipcMain pour spawn le watcher, electron-builder pour la cross-platform |
-| S3.2 | Auto-update via electron-updater + GitHub releases | 1j | Bénéfice direct user : on pousse des fixes sans demander de réinstaller |
-| S3.3 | Icons + branding minimal (logo, splash) | 0.5j | Première impression visuelle |
-| S3.4 | Build matrice macOS arm64 / macOS x64 / Linux x64 | 1j | Notarisation macOS reportée à S7.4 (besoin d'un Apple Developer ID payant) |
+| S3.1 | Bootstrap Electron + bundle Node server + Vite build | 2j | **livré** (`3d482b0`) |
+| S3.2 | Auto-update via electron-updater + GitHub releases | 1j | **livré** (`f87abb2`) |
+| S3.3 | Icons + branding minimal (logo, splash) | 0.5j | **livré** (`c1b97cd`) |
+| S3.4 | Build matrice macOS arm64 / macOS x64 / Linux x64 | 1j | **livré** (`797ecf3`) |
 
-Budget : 4.5j dev sur 10j calendaires. Marge pour dogfooding de la version packagée et bugs cross-platform.
+Budget : 4.5j dev sur 10j calendaires.
 
-**Ma proposition de séquence** : S3.1 en premier (sans ça rien d'autre n'a de sens) → S3.3 (court, motivant visuellement) → S3.4 (la matrice de build) → S3.2 (auto-update, dernier car dépend des releases GitHub qu'on doit avoir pu publier au moins une fois).
+### Architecture retenue
+
+- `electron/main.ts` importe directement `startServer()` depuis `server/index.ts` — même process, pas de child_process. Avantage : logs unifiés, shutdown propre, pas de IPC overhead. Migration possible vers `UtilityProcess` (Electron v29+) si besoin en Phase 3.
+- `externalizeDepsPlugin()` externalise tous les node_modules (chokidar, pino, zod…) — ils voyagent avec le package mais ne sont pas bundlés dans le 21 kB main bundle.
+- Renderer bundlé séparément par Vite → `dist/assets/index-*.js` (7 MB, Phaser inclus). En prod : `loadFile(dist/index.html)`. En dev : `loadURL(VITE_DEV_SERVER_URL)`.
+- `npm run dev:electron` = electron-vite dev (Vite dev server + Electron + serveur embedded). `npm run dev` = mode navigateur pur (backward compat).
+
+### Décisions prises
+
+- **Serveur embedded vs spawned** : inline dans le main process (Option A). Simpler, logs unifiés. Pas besoin d'IPC.
+- **Electron vs macOS animated wallpaper** : Electron retenu (cross-platform, Phase 2 chat panel, Phase 3 team mode). Le "widget mode" (fenêtre borderless always-below) reste possible en bonus S3.1+ avec 3 lignes.
+- **Notarisation** : reportée à S7.4 (Apple Developer ID payant). `identity: null` pour l'instant, distribué hors App Store.
+- **Signing** : `arm64 requires signing` warning ignoré pour dev — ne bloque pas le lancement local.
+
+### État final
+
+| Quoi | Valeur |
+|---|---|
+| Stories livrées | 4/4 |
+| Commits | 4 (`3d482b0`, `f87abb2`, `c1b97cd`, `797ecf3`) |
+| Tests | 68/68 (inchangé) |
+| App packagée | macOS arm64 — 284 MB (17 MB ASAR) |
+| Workflow release | trigger `v*` → macos dmg arm64+x64 + Linux AppImage x64 |
+| tsc | ✅ clean |
+
+### Retro
+
+**Ce qui a bien marché**
+- L'architecture "server inline dans main process" est propre : pas d'IPC, shutdown en cascade `before-quit → stopServer() → app.quit()`, logs pino visibles dans la console Electron en dev.
+- electron-vite 5 gère les 3 bundles (main/preload/renderer) avec une config lisible. Custom paths (`electron/main.ts` au lieu de `src/main/`) fonctionnent sans friction.
+- `externalizeDepsPlugin` + electron-builder `dependencies` = les 4 deps serveur (chokidar, pino, pino-pretty, zod, electron-updater) sont embarquées proprement sans bundling complexe.
+- Le smoke test "lancer l'app packagée, curl /api/state, vérifier les agents" a été vert du premier coup.
+- Déplacement de phaser/react/tsx/concurrently vers devDeps : packaged app n'embarque que ce qui est nécessaire à runtime.
+
+**Ce qui a été dur**
+- `electron-updater` doit être en `dependencies` (pas devDeps) pour être packagé. npm l'avait mis en devDeps par défaut — corrigé manuellement.
+- `build/icon.icns` nécessite `iconutil` macOS (present par défaut) + un `.iconset/` proprement structuré avec les noms exacts Apple. PIL pour générer les PNG, iconutil pour l'icns.
+- Le warning `arm64 requires signing` est bloquant pour distribution (App Store / Gatekeeper), pas pour dev local. Documenté, action en S7.4.
+
+**Ce qu'on garde pour Sprint 4**
+- Aucune story de S3 ne déborde — 4/4 livrées.
+- À faire avant la première release publique : renseigner `owner` + `repo` dans `electron-builder.yml`, puis `git tag v0.1.0 && git push --tags`.
+- PT.5 (split NpcManager) toujours en attente — à attaquer en Sprint 4 ou en dehors des stories.
 
 ---
 
