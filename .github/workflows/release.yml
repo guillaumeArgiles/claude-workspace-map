@@ -10,10 +10,13 @@ jobs:
   release:
     name: Build & publish ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
+          # macOS: builds both arm64 (Apple Silicon) and x64 (Intel) DMGs
           - os: macos-latest
             platform: mac
+          # Linux: AppImage x64
           - os: ubuntu-latest
             platform: linux
 
@@ -32,22 +35,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Build renderer + main process + preload
+      # Build renderer + main process + preload bundles
       - name: electron-vite build
         run: npm run build
 
       # Package and publish to GitHub Releases.
-      # GH_TOKEN is automatically available in Actions — no manual secret needed.
-      - name: Package & publish
+      # GITHUB_TOKEN is automatically injected by Actions — no manual secret needed.
+      - name: Package & publish (macOS — arm64 + x64)
+        if: matrix.platform == 'mac'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS notarisation credentials (wired in S7.4)
+          # Notarisation credentials wired in S7.4
           # APPLE_ID: ${{ secrets.APPLE_ID }}
           # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          if [ "${{ matrix.platform }}" = "mac" ]; then
-            npx electron-builder --mac --publish always
-          else
-            npx electron-builder --linux --publish always
-          fi
+        run: npx electron-builder --mac --arm64 --x64 --publish always
+
+      - name: Package & publish (Linux — x64)
+        if: matrix.platform == 'linux'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux --x64 --publish always
+
+      # Upload builder-debug.yml as artifact for debugging failed builds
+      - name: Upload build debug info
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: builder-debug-${{ matrix.platform }}
+          path: release/builder-debug.yml
+          if-no-files-found: ignore
