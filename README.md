@@ -20,11 +20,13 @@ Watch your AI agents move through pixel-art offices in real time — coding, pla
 ## Features
 
 - **Live agent tracking** — reads `~/.claude/projects/**/*.jsonl` with zero config; every session appears as a character on the map within seconds
-- **Status-aware sprites** — each agent's appearance reflects what it's doing: `coding` (at the desk), `planning` (at the board), `awaiting_input` (question mark bubble), `idle` (wandering)
-- **Dialogue bubbles** — shows the current tool and file path (`Edit → src/App.tsx`, `Bash → npm test`, …)
-- **Sub-agent lifecycle** — spawned agents appear, work, and fade when done
+- **Status-aware NPCs** — behaviour and overlays change with agent status: `coding`/`running_tool`/`planning` stand still and show a persistent tool-detail bubble; `awaiting_approval` shows a bouncing `?` glyph; `blocked` shows a `!`
+- **RPG dialogue (`E` key)** — walk up to any NPC and press `E` to open a speech bubble with their current status and tool. On `awaiting_approval` NPCs: a full RPG panel shows the pending plan or questions — `[Y]`/`[N]` to approve/reject a plan, `[1–4]` to answer a question, `[T]` to open the terminal, all written directly to the agent's PTY
+- **Persistent activity bubbles** — while an agent is coding or running tools, a live bubble above their head shows exactly what file or command they're touching, updating in real time
+- **Sub-agent lifecycle** — spawned agents appear as student NPCs, work, and fade when done
 - **A\* pathfinding** — agents navigate around obstacles on a real collision grid; no more clipping through walls
-- **Sidebar HUD** — full list of active sessions with status, project name, last tool, elapsed time
+- **PTY launcher** — spawn a new Claude Code session from the sidebar ⚡ button, or open a terminal for any existing session; the in-game `[T]` shortcut links directly into the sidebar terminal
+- **Sidebar HUD** — full list of active sessions with status, project name, last tool; inline approval widget for plans and questions; desktop notifications on `awaiting_approval` / `blocked` transitions; per-agent `×` dismiss and bulk 🧹 clear
 - **Instant hooks** — optional Claude Code hooks fire a `POST /api/hook` for immediate `awaiting_approval` / `SessionEnd` updates (no polling lag)
 - **Electron app** — ships as a `.dmg` / `.AppImage`; double-click to launch, no `npm run dev` required
 - **Auto-update** — the app checks for new releases on GitHub and prompts to install in one click
@@ -109,16 +111,19 @@ See [`docs/HOOKS_SETUP.md`](docs/HOOKS_SETUP.md) for more detail.
         │  (chokidar watcher)
         ▼
   Node HTTP server  ──── POST /api/hook  ◄── Claude Code hooks
-        │                                    (Notification, SessionEnd)
-        │  SSE  /api/events
+        │  ├── GET  /api/events (SSE)         (Notification, SessionEnd)
+        │  ├── POST /api/sessions             spawn PTY
+        │  ├── POST /api/sessions/:id/write   send input to PTY
+        │  └── GET  /api/sessions/by-session/:sessionId  PTY↔session link
         ▼
   React + Phaser 3 renderer
         │
-        ├── AgentSyncer   maps session state → NPC instances
-        ├── NpcManager    sprite lifecycle, wander, status overlays
-        ├── PlayerController  A* autopilot to clicked NPC
-        ├── DialogueUI    tool-use bubbles
-        └── CollisionLayer  physics bodies from collisions.json
+        ├── AgentSyncer      maps session state → NPC instances
+        ├── NpcManager       sprite lifecycle, status overlays, activity bubbles
+        ├── PlayerController  movement, E-key routing, A* autopilot
+        ├── DialogueUI       generic speech bubble (E on any NPC)
+        ├── RPGApprovalUI    plan/question panel (E on awaiting_approval NPC)
+        └── CollisionLayer   physics bodies from collisions.json
 ```
 
 Each `.jsonl` file is one Claude Code session. The watcher reads new bytes as they appear, parses each line with Zod, derives agent status from tool-use patterns, and broadcasts `agent_spawned / agent_updated / agent_removed` events over SSE.
@@ -154,10 +159,12 @@ The project follows a 12-sprint roadmap toward a full multi-session orchestratio
 - [x] Electron packaging — `.dmg` (arm64 + x64) + `.AppImage`
 - [x] Auto-update via GitHub Releases
 
-**Phase 2 — Talk to agents** *(coming)*
-- [ ] PTY launcher — spawn and control Claude sessions from the map
-- [ ] Chat panel — send messages to any running agent
-- [ ] Contextual responses — approve plans, answer `AskUserQuestion` prompts
+**Phase 2 — Talk to agents** *(in progress)*
+- [x] PTY launcher — spawn and control Claude sessions from the map sidebar
+- [x] RPG approval dialogue — press `E` on a waiting NPC to approve plans or answer questions directly from the map
+- [x] Persistent activity bubbles — real-time tool-detail above each NPC while coding
+- [x] NPC behaviour by status — pinned during active work, bouncing `?` on approval wait
+- [ ] Chat panel — send free-text messages to any running agent
 - [ ] Proactive master agent — when all sessions are idle, suggests tasks, asks about your project, preps your day
 
 **Phase 3 — Team mode** *(planned)*
