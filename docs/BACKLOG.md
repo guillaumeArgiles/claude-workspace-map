@@ -23,12 +23,19 @@ But : PoC → outil installable, stable, partageable.
 - [ ] **S1.4** Vitest setup + tests sur `parser.ts` (~1j)
 - [ ] **S1.5** ADR 0001 — décision PTY/tmux (~0.5j)
 
-### Sprint 2 — Types stricts + tests étendus
+### Sprint 2 — Types stricts + tests étendus + pathfinding
 
 - [ ] **S2.1** Zod (ou typebox) pour valider chaque ligne JSONL avant parsing
 - [ ] **S2.2** Tests sur `server/watcher.ts` (add/change/unlink, byte offset, sub-agents)
 - [ ] **S2.3** Strict TS settings (noUnusedLocals, noUnusedParameters, noImplicitReturns)
 - [ ] **S2.4** CI GitHub Actions : tsc + vitest + lint sur PR
+- [ ] **S2.5** **Pathfinding A\* grid-based** pour le player (auto-walk) ET les NPCs (wander)
+  - Construire une nav-grid 1440×864 (cellules 16 ou 24 px) marquée walkable/blocked depuis `collisions.json` + une marge autour des obstacles
+  - A* avec heuristique Chebyshev (8-direction), smoothing Bresenham pour les diagonales propres
+  - Remplace `playerAutoWalk` (ligne droite + sliding) par chemin pré-calculé
+  - Étend `NpcManager.pickWanderTarget` pour rejeter les cibles unreachable
+  - Mode `?debug` : visualiser la nav-grid en overlay
+  - **Source** : pain point user (S1 feedback, blocage régulier dans les murs)
 
 ### Sprint 3 — Packaging Electron
 
@@ -67,12 +74,22 @@ But : observateur → orchestrateur. "Wow moment" pour les démos.
 - [ ] **S6.3** Envoi via `pty.write` + streaming retour via JSONL watcher
 - [ ] **S6.4** Politique de gestion sessions externes (avertir user, re-lancer dans PTY, ignorer)
 
-### Sprint 7 — Réponses contextuelles
+### Sprint 7 — Réponses contextuelles + workspace vivant
 
 - [ ] **S7.1** UI dédiée AskUserQuestion : parse questions, boutons radio, submit
 - [ ] **S7.2** Modal ExitPlanMode : afficher plan complet, Approve / Reject / Edit
 - [ ] **S7.3** Popup natif Notification (Electron) avec input réponse rapide
 - [ ] **S7.4** Notarisation macOS Developer ID + Linux AppImage signing
+- [ ] **S7.5** **Comportement par statut → lieu** (POIs par maison)
+  - POIs : `kanban_board` (haut centre), `coding_desk` (centre), `monitor_wall` (Monitoring), `meeting_table` (Review), `coffee_corner` (hors maison)
+  - Mapping : `planning`/`awaiting_approval` → board ; `coding` (Edit/Write) → desk ; `running_tool` (Bash/Read/Grep) → desk ; `idle` → coffee_corner ou wander libre ; `awaiting_input` (Notification) → board avec `?`
+  - NpcManager.wander étendu pour préférer le POI lié au statut (au lieu d'un random in radius)
+  - **Source** : pain point user (S1 feedback, "donner vie au workspace")
+- [ ] **S7.6** **Panneau Scheduled routines** sur la map
+  - Server : détecter d'où Claude Code stocke les scheduled tasks (probablement `~/.claude/scheduled-tasks.json` ou via le MCP `scheduled-tasks` bridgé). À investiguer en début de story.
+  - `GET /api/routines` : liste les routines avec name / cron / nextRun / lastRun / lastStatus
+  - UI : nouveau panneau pixel art dans le jardin (à côté du panneau "AI AGENT WORKSPACE"), au clic → modal avec la liste détaillée + animation "fires now" quand une routine déclenche
+  - **Source** : user — "routine de Claude Code que j'aimerais retrouver"
 
 ### Sprint 8 — Polish + métriques
 
@@ -187,3 +204,14 @@ But : démontrer une willingness to pay.
 - Click sur projet header pour collapse/expand
 - Sound effects (notification, blocked, etc.)
 - Animation spawn maison quand 1er agent arrive
+
+## Décisions PO récentes (feedback user → bucket)
+
+Triage du 2026-05-24 sur 4 idées remontées par dogfooding :
+
+| Idée | Décision |
+|---|---|
+| Fenêtre de contexte pour parler / approuver une action | Déjà au plan — Phase 2, Sprint 5-7 (PTY wrap + Réponses contextuelles). Pas de changement. |
+| Améliorer le pathfinding (blocage dans les murs) | Story S2.5 ajoutée. A* grid-based, ~2j, démarre Sprint 2. |
+| Comportement par statut → lieu (planning → tableau, coding → bureau) | Story S7.5 ajoutée. Liée à l'interactivité, démarre Sprint 7. |
+| Tâches planifiées (routines Claude Code) sur la map | Story S7.6 ajoutée. Panneau dans le jardin + modal. À investiguer le stockage des routines en début de story. |
