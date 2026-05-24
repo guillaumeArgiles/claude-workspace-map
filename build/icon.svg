@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" shape-rendering="crispEdges">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#1a1a2e"/>
+
+  <!-- Grid floor (pixel art style) -->
+  <rect x="48" y="320" width="416" height="144" fill="#16213e"/>
+  <rect x="48" y="320" width="416" height="4" fill="#0f3460"/>
+
+  <!-- House / building -->
+  <rect x="80" y="176" width="160" height="144" fill="#533483"/>
+  <rect x="80" y="144" width="168" height="36" fill="#e94560"/>
+  <!-- House window -->
+  <rect x="112" y="208" width="40" height="40" fill="#a8e6cf"/>
+  <rect x="184" y="208" width="40" height="40" fill="#a8e6cf"/>
+  <!-- House door -->
+  <rect x="144" y="272" width="32" height="48" fill="#0f3460"/>
+
+  <!-- Second house (smaller) -->
+  <rect x="288" y="208" width="128" height="112" fill="#533483"/>
+  <rect x="288" y="184" width="136" height="28" fill="#e94560"/>
+  <!-- Window -->
+  <rect x="312" y="228" width="32" height="32" fill="#a8e6cf"/>
+  <rect x="368" y="228" width="32" height="32" fill="#a8e6cf"/>
+  <!-- Door -->
+  <rect x="336" y="280" width="24" height="40" fill="#0f3460"/>
+
+  <!-- Agent sprite (simple pixel character) -->
+  <!-- Body -->
+  <rect x="200" y="264" width="24" height="32" fill="#4fc3f7"/>
+  <!-- Head -->
+  <rect x="196" y="240" width="32" height="28" fill="#ffcc80"/>
+  <!-- Legs -->
+  <rect x="200" y="296" width="8" height="24" fill="#1565c0"/>
+  <rect x="216" y="296" width="8" height="24" fill="#1565c0"/>
+  <!-- Status glow (green = active) -->
+  <rect x="220" y="236" width="12" height="12" rx="6" fill="#4caf50"/>
+  <rect x="220" y="236" width="12" height="12" rx="6" fill="#4caf50" opacity="0.4"/>
+
+  <!-- Path dots (connecting houses) -->
+  <rect x="244" y="316" width="8" height="8" rx="4" fill="#e94560" opacity="0.7"/>
+  <rect x="262" y="316" width="8" height="8" rx="4" fill="#e94560" opacity="0.5"/>
+  <rect x="280" y="316" width="8" height="8" rx="4" fill="#e94560" opacity="0.3"/>
+</svg>
