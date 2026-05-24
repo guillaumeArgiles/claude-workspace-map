@@ -5,6 +5,7 @@ import { SessionWatcher } from "./watcher.js";
 import { child } from "./logger.js";
 import { setValidationErrorSink } from "./parser.js";
 import { ptyManager } from "./pty-manager.js";
+import { streamProfessorResponse, type ProfessorRequest } from "./professor.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 /** MIME types for static file serving (renderer assets in prod). */
@@ -251,6 +252,32 @@ export async function startServer(
       const ok = ptyManager.kill(deleteMatch[1]);
       res.writeHead(ok ? 200 : 404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok }));
+      return;
+    }
+
+    // POST /api/professor — streaming conversation with the Professeur NPC.
+    // Body: { messages: [{role, content}][] }  (full history, client-managed)
+    // Response: SSE stream  data: {chunk} … data: {done:true}
+    if (req.method === "POST" && url === "/api/professor") {
+      let body = "";
+      try {
+        for await (const chunk of req) body += chunk;
+        const payload = JSON.parse(body) as ProfessorRequest;
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        });
+        await streamProfessorResponse(payload, watcher.list(), (data) => {
+          try { res.write(data); } catch { /* client disconnected */ }
+        });
+        res.end();
+      } catch (err) {
+        if (!res.headersSent) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+        }
+        res.end(JSON.stringify({ error: String(err) }));
+      }
       return;
     }
 
