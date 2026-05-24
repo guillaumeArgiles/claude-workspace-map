@@ -182,6 +182,14 @@ See [`docs/SPRINTS.md`](docs/SPRINTS.md) for the sprint history and [`docs/BACKL
 
 ---
 
+## Credits
+
+Character sprites: **[Pipoya — Free RPG Character Sprites 32×32](https://pipoya.itch.io/pipoya-free-rpg-character-sprites-32x32)**, obtained via [clkao/swonline](https://github.com/clkao/swonline).
+
+See [CREDITS.md](CREDITS.md) for the full attribution list.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
