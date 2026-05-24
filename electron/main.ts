@@ -1,6 +1,7 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, dialog, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { autoUpdater } from "electron-updater";
 import { startServer } from "../server/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -16,6 +17,58 @@ const PRELOAD = path.join(__dirname, "../preload/index.js");
 const RENDERER_DIST = path.join(__dirname, "../../dist");
 
 let stopServer: (() => Promise<void>) | undefined;
+
+// ─── Auto-updater ────────────────────────────────────────────────────────────
+
+function setupAutoUpdater(win: BrowserWindow): void {
+  // Disable update checks in dev — no packaged app context
+  if (VITE_DEV_SERVER_URL) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("update-available", (info) => {
+    console.log(`[updater] Update available: ${info.version}`);
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    dialog
+      .showMessageBox(win, {
+        type: "info",
+        title: "Update ready",
+        message: `Claude Workspace Map ${info.version} is ready to install.`,
+        detail: "Restart now to apply the update, or it will install on next launch.",
+        buttons: ["Restart now", "Later"],
+        defaultId: 0,
+        cancelId: 1,
+      })
+      .then(({ response }) => {
+        if (response === 0) autoUpdater.quitAndInstall();
+      })
+      .catch(() => {
+        /* user closed the dialog */
+      });
+  });
+
+  autoUpdater.on("error", (err) => {
+    // Non-fatal: log only. A failed update check should never crash the app.
+    console.error("[updater] Error:", err.message);
+  });
+
+  // Check once on launch, then every 4 hours
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {
+    /* network may be unavailable */
+  });
+
+  const FOUR_HOURS = 4 * 60 * 60 * 1000;
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {
+      /* ignore periodic check failures */
+    });
+  }, FOUR_HOURS);
+}
+
+// ─── Window ──────────────────────────────────────────────────────────────────
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -50,6 +103,8 @@ function createWindow(): BrowserWindow {
     }
     return { action: "deny" };
   });
+
+  setupAutoUpdater(win);
 
   return win;
 }
