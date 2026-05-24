@@ -164,10 +164,13 @@ export class AgentSyncer {
     npc.def.currentTool = agent.currentTool;
     npc.def.currentToolDetail = agent.currentToolDetail;
     npc.def.dialogue = statusDialogue(agent);
+    npc.def.pendingPlan = agent.pendingPlan;
+    npc.def.pendingQuestions = agent.pendingQuestions;
     this.npcManager.refreshStatusBadge(npc);
     if (this.dialogue.openNpc === npc) this.dialogue.refresh(npc);
     if (prevTool !== agent.currentTool || prevDetail !== agent.currentToolDetail) {
-      this.npcManager.showActivityBubble(npc);
+      const persistent = agent.status === "coding" || agent.status === "running_tool";
+      this.npcManager.showActivityBubble(npc, persistent);
     }
 
     const studentMap = this.studentNpcs.get(agent.sessionId) ?? new Map();
@@ -341,6 +344,8 @@ export class AgentSyncer {
       y: pos.y,
       sprite: TEACHER_SPRITES[spriteIdx],
       dialogue: statusDialogue(agent),
+      pendingPlan: agent.pendingPlan,
+      pendingQuestions: agent.pendingQuestions,
     };
   }
 

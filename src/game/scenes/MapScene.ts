@@ -15,6 +15,7 @@ import {
   type CollisionsFile,
 } from "../world/CollisionLayer";
 import { NavGrid } from "../world/NavGrid";
+import { RPGApprovalUI } from "../ui/RPGApprovalUI";
 
 const BACKGROUND_KEY = "workspace-background";
 
@@ -31,6 +32,7 @@ export class MapScene extends Phaser.Scene {
   private collision = new CollisionLayer(this);
   private npcManager = new NpcManager(this);
   private dialogue = new DialogueUI(this);
+  private approvalUI = new RPGApprovalUI(this);
   private agentSyncer = new AgentSyncer(this, this.npcManager, this.dialogue, {
     onStatusChange: (text, severity) => {
       if (!this.statusText) return;
@@ -45,6 +47,7 @@ export class MapScene extends Phaser.Scene {
     this,
     this.npcManager,
     this.dialogue,
+    this.approvalUI,
     {
       findNpcById: (id) => this.agentSyncer.findNpcById(id),
       findHouseForNpc: (npc) => this.agentSyncer.findHouseForNpc(npc),

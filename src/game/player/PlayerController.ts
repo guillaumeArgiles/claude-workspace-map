@@ -10,6 +10,7 @@ import type { House } from "../world/houseLayout";
 import type { Direction, NpcInstance } from "../agents/types";
 import type { NpcManager } from "../agents/NpcManager";
 import type { DialogueUI } from "../ui/DialogueUI";
+import type { RPGApprovalUI } from "../ui/RPGApprovalUI";
 import type { NavGrid } from "../world/NavGrid";
 
 interface AutoWalkState {
@@ -43,6 +44,7 @@ export class PlayerController {
     private readonly scene: Phaser.Scene,
     private readonly npcManager: NpcManager,
     private readonly dialogue: DialogueUI,
+    private readonly approvalUI: RPGApprovalUI,
     private readonly deps: PlayerControllerDeps
   ) {}
 
@@ -79,6 +81,7 @@ export class PlayerController {
     // continues to work normally — player movement and E-key interactions are
     // unaffected.
     this.scene.input.keyboard!.disableGlobalCapture();
+    this.approvalUI.init();
 
     return sprite;
   }
@@ -180,6 +183,7 @@ export class PlayerController {
       this.npcManager.needsRightFlip("player") && this.lastDir === "right"
     );
 
+    this.approvalUI.update();
     this.updateNearestNpc();
     this.updateDialogueInput();
   }
@@ -260,13 +264,15 @@ export class PlayerController {
   }
 
   private updateDialogueInput(): void {
+    // The approval UI handles its own key input in update() — don't interfere.
+    if (this.approvalUI.isOpen()) return;
+
     if (!Phaser.Input.Keyboard.JustDown(this.interactKey)) return;
     if (this.dialogue.isOpen()) {
       this.dialogue.close();
       return;
     }
-    // Re-evaluate the nearest NPC right now so pressing E always uses the
-    // freshest target (cheap — same loop as updateNearestNpc).
+    // Re-evaluate the nearest NPC so pressing E always uses the freshest target.
     let best: NpcInstance | undefined;
     let bestDist = INTERACTION_RADIUS;
     for (const npc of this.npcManager.npcs) {
@@ -276,6 +282,16 @@ export class PlayerController {
         best = npc;
       }
     }
-    if (best) this.dialogue.open(best);
+    if (!best) return;
+
+    // P0: awaiting_approval NPCs with pending data get the RPG approval dialogue.
+    const hasPending =
+      best.def.pendingPlan !== undefined ||
+      (best.def.pendingQuestions?.length ?? 0) > 0;
+    if (best.def.status === "awaiting_approval" && hasPending) {
+      this.approvalUI.open(best);
+    } else {
+      this.dialogue.open(best);
+    }
   }
 }

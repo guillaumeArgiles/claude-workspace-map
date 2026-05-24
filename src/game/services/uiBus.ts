@@ -8,6 +8,8 @@ type Handler<T> = (data: T) => void;
 export interface UiEvents {
   /** Tell the scene to highlight an agent (or sub-agent) by id. */
   highlight_agent: { id: string };
+  /** Tell the sidebar to open the terminal for a given Claude session. */
+  open_terminal: { sessionId: string };
 }
 
 class UiBus {

@@ -146,6 +146,12 @@ export class NpcManager {
     npc.statusBadge?.destroy();
     npc.statusBadge = this.makeStatusBadge(npc.def.status ?? "idle");
     this.refreshStatusGlyph(npc);
+    // P1: clear persistent activity bubble when leaving an active status
+    const s = npc.def.status;
+    if (s !== "coding" && s !== "running_tool") {
+      npc.activityBubble?.destroy();
+      npc.activityBubble = undefined;
+    }
   }
 
   private makeStatusBadge(status: AgentStatus): Phaser.GameObjects.Graphics {
@@ -186,7 +192,12 @@ export class NpcManager {
   }
 
   /** Pop a transient bubble above the agent's head with their current activity. */
-  showActivityBubble(npc: NpcInstance): void {
+  /**
+   * Show a bubble with the agent's current tool + detail.
+   * When `persistent` is true the bubble stays until explicitly cleared
+   * (used for coding / running_tool so the detail stays visible in real-time).
+   */
+  showActivityBubble(npc: NpcInstance, persistent = false): void {
     const tool = npc.def.currentTool;
     if (!tool) {
       npc.activityBubble?.destroy();
@@ -223,16 +234,18 @@ export class NpcManager {
     npc.activityBubble = container;
     this.positionActivityBubble(npc);
 
-    this.scene.tweens.add({
-      targets: container,
-      alpha: 0,
-      delay: 3500,
-      duration: 500,
-      onComplete: () => {
-        if (npc.activityBubble === container) npc.activityBubble = undefined;
-        container.destroy();
-      },
-    });
+    if (!persistent) {
+      this.scene.tweens.add({
+        targets: container,
+        alpha: 0,
+        delay: 3500,
+        duration: 500,
+        onComplete: () => {
+          if (npc.activityBubble === container) npc.activityBubble = undefined;
+          container.destroy();
+        },
+      });
+    }
   }
 
   // ----- Per-frame update -----
@@ -264,14 +277,16 @@ export class NpcManager {
       return;
     }
 
-    // Pinned statuses: the agent stands still. Movement would be a distraction
-    // when the agent is actually waiting / stuck / done.
+    // Pinned statuses: the agent stands still.
     const status = npc.def.status ?? "idle";
     if (
       status === "blocked" ||
       status === "awaiting_approval" ||
       status === "done" ||
-      status === "idle"
+      status === "idle" ||
+      status === "coding" ||       // P2: no wander during active work
+      status === "running_tool" ||
+      status === "planning"
     ) {
       npc.sprite.setVelocity(0, 0);
       playIdle();
@@ -368,8 +383,8 @@ export class NpcManager {
   private repositionGlyph(npc: NpcInstance): void {
     if (!npc.statusGlyph) return;
     const sprite = npc.sprite;
-    // Gentle bob synced to global time so glyphs all bob in sync (cheap, no tween).
-    const bob = Math.sin(this.scene.time.now / 280) * 3;
+    const isAwaiting = npc.def.status === "awaiting_approval";
+    const bob = Math.sin(this.scene.time.now / (isAwaiting ? 350 : 280)) * (isAwaiting ? 7 : 3);
     npc.statusGlyph.setPosition(
       sprite.x,
       sprite.y - sprite.displayHeight * 0.5 - 22 + bob

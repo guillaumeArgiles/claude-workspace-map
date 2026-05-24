@@ -1,4 +1,4 @@
-import type { AgentStatus } from "../../../shared/agent-types";
+import type { AgentStatus, PendingQuestion } from "../../../shared/agent-types";
 
 /** Cardinal direction used to drive the 4-direction RPG-Maker animations. */
 export type Direction = "down" | "left" | "right" | "up";
@@ -23,6 +23,10 @@ export interface NpcDef {
   dialogue: string;
   /** Filename (without extension) under /assets/sprites/. */
   sprite: string;
+  /** Populated when the agent is waiting on ExitPlanMode approval. */
+  pendingPlan?: string;
+  /** Populated when the agent is waiting on AskUserQuestion. */
+  pendingQuestions?: PendingQuestion[];
 }
 
 export interface NpcInstance {

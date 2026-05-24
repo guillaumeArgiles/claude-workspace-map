@@ -10,6 +10,7 @@ import {
   studentSpriteFor,
 } from "../../shared/agent-sprites";
 import { STATUS_COLOR, STATUS_LABEL, statusOrder } from "../../shared/agent-ui";
+import { uiBus } from "../game/services/uiBus";
 import { SpawnPanel } from "./SpawnPanel";
 import { TerminalOverlay } from "./TerminalOverlay";
 
@@ -67,6 +68,8 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   );
   /** Kept fresh each render so the notification onclick can open the right terminal. */
   const agentClickRef = useRef<(a: AgentState) => void>(() => {});
+  /** Kept fresh for the uiBus open_terminal handler (stable closure via ref). */
+  const agentsRef = useRef<AgentState[]>([]);
   /** Previous status per sessionId — lets us fire only on transitions. */
   const prevStatusRef = useRef<Map<string, string>>(new Map());
 
@@ -178,8 +181,9 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
       void resumeSession(agent);
     }
   }
-  // Keep the ref fresh so notification onclick always calls the current version.
+  // Keep refs fresh every render.
   agentClickRef.current = handleAgentClick;
+  agentsRef.current = agents;
 
   /** Dismiss a single agent (hide until it has new activity). */
   function dismissAgent(sessionId: string) {
@@ -190,6 +194,16 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   function dismissAllInactive() {
     fetch("/api/agents", { method: "DELETE" }).catch(() => {});
   }
+
+  // ── uiBus: open_terminal from the Phaser game ─────────────────────────────
+  useEffect(() => {
+    const handler = ({ sessionId }: { sessionId: string }) => {
+      const agent = agentsRef.current.find((a) => a.sessionId === sessionId);
+      if (agent) agentClickRef.current(agent);
+    };
+    uiBus.on("open_terminal", handler);
+    return () => uiBus.off("open_terminal", handler);
+  }, []); // stable via refs
 
   // ── Notification helpers ──────────────────────────────────────────────────
 

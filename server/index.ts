@@ -68,6 +68,17 @@ export async function startServer(
 
   const watcher = new SessionWatcher({
     onSpawn(agent: AgentState) {
+      // Link new Claude session to the PTY that spawned it (same cwd, no session yet,
+      // started within 5 min of each other).
+      const unlinked = ptyManager
+        .list()
+        .find(
+          (p) =>
+            p.cwd === agent.cwd &&
+            !p.sessionId &&
+            Math.abs(p.createdAt - agent.startedAt) < 300_000
+        );
+      if (unlinked) ptyManager.linkSession(unlinked.id, agent.sessionId);
       broadcast({ type: "agent_spawned", agent });
     },
     onUpdate(agent: AgentState) {
@@ -194,6 +205,16 @@ export async function startServer(
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: String(err) }));
       }
+      return;
+    }
+
+    // GET /api/sessions/by-session/:sessionId — resolve ptyId from Claude sessionId
+    const bySessionMatch = url.match(/^\/api\/sessions\/by-session\/([^/]+)$/);
+    if (req.method === "GET" && bySessionMatch) {
+      const sessionId = decodeURIComponent(bySessionMatch[1]);
+      const found = ptyManager.list().find((s) => s.sessionId === sessionId);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ptyId: found?.id ?? null }));
       return;
     }
 
