@@ -60,7 +60,10 @@ export class AgentSyncer {
       for (const sessionId of Array.from(this.teacherNpcs.keys())) {
         this.removeAgent(sessionId);
       }
-      for (const a of agents) this.spawnAgent(a);
+      // Spawn most-recently-active agents first so the 3 houses always go to
+      // the 3 cwds with the latest activity (not the 3 oldest cwds).
+      const sorted = [...agents].sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+      for (const a of sorted) this.spawnAgent(a);
       this.reportCount();
     });
     this.agentSource.on("spawn", (a) => {
@@ -121,7 +124,7 @@ export class AgentSyncer {
       return;
     }
     if (!agent.cwd) return;
-    const placement = this.assignToHouse(agent.cwd, agent.sessionId, agent.projectName);
+    const placement = this.assignToHouse(agent.cwd, agent.sessionId, agent.projectName, agent.lastActivityAt);
     if (!placement) return; // all houses are busy with other projects
 
     const def = this.agentToNpcDef(agent, placement.house, placement.slot);
@@ -146,6 +149,12 @@ export class AgentSyncer {
       // Wasn't spawned yet — maybe cwd just arrived or a house freed up.
       this.spawnAgent(agent);
       return;
+    }
+
+    // Keep the house recency fresh so eviction picks the right victim.
+    const houseState = [...this.housesByCwd.values()].find(s => s.teachers.has(agent.sessionId));
+    if (houseState && agent.lastActivityAt > houseState.lastActivityAt) {
+      houseState.lastActivityAt = agent.lastActivityAt;
     }
 
     const prevTool = npc.def.currentTool;
@@ -232,16 +241,33 @@ export class AgentSyncer {
   private assignToHouse(
     cwd: string,
     sessionId: string,
-    projectName: string
+    projectName: string,
+    lastActivityAt: number
   ): { house: House; slot: number } | null {
     let state = this.housesByCwd.get(cwd);
     if (!state) {
       const free = HOUSES.find((h) => !this.usedHouseIds.has(h.id));
-      if (!free) return null;
-      state = { house: free, cwd, teachers: new Map() };
-      state.label = this.makeHouseLabel(free, projectName);
-      this.housesByCwd.set(cwd, state);
-      this.usedHouseIds.add(free.id);
+      if (!free) {
+        // All houses occupied — evict the least-recently-active cwd if this
+        // one is newer than it, so the map always shows the 3 hottest projects.
+        const evicted = this.evictLeastActiveHouse(lastActivityAt);
+        if (!evicted) return null; // this cwd is older than all current ones
+        // evicted house is now free
+        const nowFree = HOUSES.find((h) => !this.usedHouseIds.has(h.id));
+        if (!nowFree) return null;
+        state = { house: nowFree, cwd, teachers: new Map(), lastActivityAt };
+        state.label = this.makeHouseLabel(nowFree, projectName);
+        this.housesByCwd.set(cwd, state);
+        this.usedHouseIds.add(nowFree.id);
+      } else {
+        state = { house: free, cwd, teachers: new Map(), lastActivityAt };
+        state.label = this.makeHouseLabel(free, projectName);
+        this.housesByCwd.set(cwd, state);
+        this.usedHouseIds.add(free.id);
+      }
+    } else {
+      // Update recency so this house stays competitive on future eviction checks.
+      if (lastActivityAt > state.lastActivityAt) state.lastActivityAt = lastActivityAt;
     }
     let slot = state.teachers.get(sessionId);
     if (slot === undefined) {
@@ -251,6 +277,26 @@ export class AgentSyncer {
       state.teachers.set(sessionId, slot);
     }
     return { house: state.house, slot };
+  }
+
+  /**
+   * Find the cwd with the oldest lastActivityAt among occupied houses and
+   * evict all its agents if `incomingActivity` is newer.
+   * Returns true if an eviction happened, false if nothing was evicted.
+   */
+  private evictLeastActiveHouse(incomingActivity: number): boolean {
+    let oldest: HouseState | null = null;
+    for (const state of this.housesByCwd.values()) {
+      if (!oldest || state.lastActivityAt < oldest.lastActivityAt) {
+        oldest = state;
+      }
+    }
+    if (!oldest || oldest.lastActivityAt >= incomingActivity) return false;
+    // Remove all agents in that cwd's house.
+    for (const sessionId of Array.from(oldest.teachers.keys())) {
+      this.removeAgent(sessionId);
+    }
+    return true;
   }
 
   private releaseFromHouse(cwd: string, sessionId: string): void {

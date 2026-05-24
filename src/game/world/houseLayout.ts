@@ -21,6 +21,9 @@ export interface HouseState {
   teachers: Map<string, number>;
   /** Project name banner rendered above the house. */
   label?: Phaser.GameObjects.Text;
+  /** Most recent lastActivityAt across all sessions in this cwd — used to evict
+   *  the least-active house when all slots are taken and a more recent cwd arrives. */
+  lastActivityAt: number;
 }
 
 /**
