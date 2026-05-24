@@ -67,6 +67,10 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   const [chatDraft, setChatDraft] = useState("");
   /** sessionId currently being sent (shows spinner). */
   const [chatSendingId, setChatSendingId] = useState<string | null>(null);
+  /** Accumulated ANSI-stripped PTY output per sessionId. */
+  const [chatOutputs, setChatOutputs] = useState<Map<string, string>>(new Map());
+  /** Active PTY output SSE connections (keyed by sessionId). */
+  const chatEsRef = useRef<Map<string, EventSource>>(new Map());
 
   // ── SSE subscription ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -181,7 +185,50 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
     }
   }
 
+  // ── Cleanup SSE on unmount ────────────────────────────────────────────────
+  useEffect(() => {
+    const ref = chatEsRef.current;
+    return () => { for (const es of ref.values()) es.close(); ref.clear(); };
+  }, []);
+
   // ── Chat helpers ──────────────────────────────────────────────────────────
+
+  /** Strip ANSI escape sequences from raw PTY output. */
+  function stripAnsi(s: string): string {
+    // eslint-disable-next-line no-control-regex
+    return s
+      .replace(/\x1b(?:\[[0-9;?]*[A-Za-z]|\][^\x07]*\x07|[()][A-B])/g, "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n");
+  }
+
+  /** Start streaming PTY output into chatOutputs for `sessionId`. Idempotent. */
+  function startOutputSub(sessionId: string, ptyId: string) {
+    if (chatEsRef.current.has(sessionId)) return;
+    const es = new EventSource(`/api/sessions/${ptyId}/output`);
+    es.onmessage = (e) => {
+      try {
+        const { chunk } = JSON.parse(e.data) as { chunk: string };
+        const text = stripAnsi(chunk);
+        if (!text) return;
+        setChatOutputs((prev) => {
+          const next = new Map(prev);
+          const existing = next.get(sessionId) ?? "";
+          const combined = existing + text;
+          // Keep last 8 KB to avoid unbounded growth.
+          next.set(sessionId, combined.length > 8192 ? combined.slice(-8192) : combined);
+          return next;
+        });
+      } catch { /* ignore parse errors */ }
+    };
+    chatEsRef.current.set(sessionId, es);
+  }
+
+  /** Stop and clean up PTY output subscription for `sessionId`. */
+  function stopOutputSub(sessionId: string) {
+    const es = chatEsRef.current.get(sessionId);
+    if (es) { es.close(); chatEsRef.current.delete(sessionId); }
+  }
 
   /**
    * Ensure a background PTY exists for `cwd`.
@@ -226,6 +273,9 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
     try {
       const ptyId = await ensurePty(agent.cwd);
       if (!ptyId) return;
+      // Ensure output subscription is active (in case toggleChat's async call
+      // hasn't resolved yet).
+      startOutputSub(agent.sessionId, ptyId);
 
       await fetch(`/api/sessions/${ptyId}/write`, {
         method: "POST",
@@ -242,13 +292,20 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   }
 
   /** Toggle the chat input for a given session. */
-  function toggleChat(sessionId: string) {
+  function toggleChat(sessionId: string, agent: AgentState) {
     if (chatOpenId === sessionId) {
       setChatOpenId(null);
       setChatDraft("");
+      stopOutputSub(sessionId);
     } else {
       setChatOpenId(sessionId);
       setChatDraft("");
+      // Clear stale output so each conversation starts fresh.
+      setChatOutputs((prev) => { const next = new Map(prev); next.delete(sessionId); return next; });
+      // Proactively ensure PTY and start streaming output.
+      ensurePty(agent.cwd).then((ptyId) => {
+        if (ptyId) startOutputSub(sessionId, ptyId);
+      }).catch(() => {});
     }
   }
 
@@ -335,8 +392,9 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
                         chatOpen={chatOpenId === a.sessionId}
                         chatDraft={chatOpenId === a.sessionId ? chatDraft : ""}
                         chatSending={chatSendingId === a.sessionId}
+                        chatOutput={chatOutputs.get(a.sessionId) ?? ""}
                         onClick={() => handleAgentClick(a)}
-                        onChatToggle={() => toggleChat(a.sessionId)}
+                        onChatToggle={() => toggleChat(a.sessionId, a)}
                         onChatDraftChange={setChatDraft}
                         onChatSend={(msg) => void sendChatMessage(a, msg)}
                       />
@@ -387,6 +445,7 @@ function AgentRow({
   chatOpen,
   chatDraft,
   chatSending,
+  chatOutput,
   onClick,
   onChatToggle,
   onChatDraftChange,
@@ -398,6 +457,7 @@ function AgentRow({
   chatOpen: boolean;
   chatDraft: string;
   chatSending: boolean;
+  chatOutput: string;
   onClick: () => void;
   onChatToggle: () => void;
   onChatDraftChange: (v: string) => void;
@@ -405,11 +465,19 @@ function AgentRow({
 }) {
   const liveSubs = agent.subAgents.filter((s) => !s.finished);
   const inputRef = useRef<HTMLInputElement>(null);
+  const outputRef = useRef<HTMLPreElement>(null);
 
   // Auto-focus the chat input when it opens.
   useEffect(() => {
     if (chatOpen) inputRef.current?.focus();
   }, [chatOpen]);
+
+  // Auto-scroll output to bottom on new content.
+  useEffect(() => {
+    if (outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    }
+  }, [chatOutput]);
 
   let termTitle: string;
   if (resuming)            termTitle = "Opening Claude Code…";
@@ -467,34 +535,41 @@ function AgentRow({
         </button>
       </div>
 
-      {/* ── Inline chat input ──────────────────────────────────────────────── */}
+      {/* ── Inline chat panel ──────────────────────────────────────────────── */}
       {chatOpen && (
         <div className="chat-panel">
-          <input
-            ref={inputRef}
-            className="chat-input"
-            type="text"
-            value={chatDraft}
-            placeholder="Type a message…"
-            disabled={chatSending}
-            onChange={(e) => onChatDraftChange(e.target.value)}
-            onKeyDown={(e) => {
-              e.stopPropagation(); // prevent Phaser from eating key events
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onChatSend(chatDraft);
-              }
-              if (e.key === "Escape") onChatToggle();
-            }}
-          />
-          <button
-            className="chat-send-btn"
-            disabled={chatSending || !chatDraft.trim()}
-            onClick={() => onChatSend(chatDraft)}
-            title="Send (Enter)"
-          >
-            {chatSending ? "…" : "↵"}
-          </button>
+          {/* PTY output area */}
+          {chatOutput && (
+            <pre ref={outputRef} className="chat-output">{chatOutput}</pre>
+          )}
+          {/* Input row */}
+          <div className="chat-input-row">
+            <input
+              ref={inputRef}
+              className="chat-input"
+              type="text"
+              value={chatDraft}
+              placeholder="Type a message…"
+              disabled={chatSending}
+              onChange={(e) => onChatDraftChange(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation(); // prevent Phaser from eating key events
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onChatSend(chatDraft);
+                }
+                if (e.key === "Escape") onChatToggle();
+              }}
+            />
+            <button
+              className="chat-send-btn"
+              disabled={chatSending || !chatDraft.trim()}
+              onClick={() => onChatSend(chatDraft)}
+              title="Send (Enter)"
+            >
+              {chatSending ? "…" : "↵"}
+            </button>
+          </div>
         </div>
       )}
 
