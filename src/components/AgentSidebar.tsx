@@ -102,6 +102,15 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
     return () => es.close();
   }, []);
 
+  // ── Professor NPC interaction (Phaser → React) ───────────────────────────
+  const spawnProfessorRef = useRef<() => void>(() => {});
+  spawnProfessorRef.current = () => void spawnProfessor();
+  useEffect(() => {
+    const handler = () => spawnProfessorRef.current();
+    uiBus.on("spawn_professor", handler);
+    return () => uiBus.off("spawn_professor", handler);
+  }, []);
+
   // ── PTY session management ────────────────────────────────────────────────
   /** Spawn a brand-new Claude session in cwd and open its terminal. */
   async function spawnFresh(cwd: string) {

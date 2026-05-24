@@ -51,6 +51,7 @@ export class MapScene extends Phaser.Scene {
     {
       findNpcById: (id) => this.agentSyncer.findNpcById(id),
       findHouseForNpc: (npc) => this.agentSyncer.findHouseForNpc(npc),
+      onProfessorInteract: () => uiBus.emit("spawn_professor", {}),
     }
   );
 
@@ -152,6 +153,20 @@ export class MapScene extends Phaser.Scene {
       })
       .setScrollFactor(0)
       .setDepth(layerDepth.UI);
+
+    // The Professor — a static NPC at the centre of the map. Always present,
+    // interacting with him (E key) spawns his dedicated Claude Code session.
+    this.npcManager.spawn({
+      id: "professor",
+      name: "Le Professeur",
+      x: GRID.width / 2,
+      y: GRID.height - 250,
+      dialogue: "Comment puis-je t'aider ?",
+      sprite: "",
+      hairColor: "#f59e0b",   // amber — academic/wise
+      clothesColor: "#4338ca", // indigo — academic robe
+      static: true,
+    });
 
     this.agentSyncer.start();
 

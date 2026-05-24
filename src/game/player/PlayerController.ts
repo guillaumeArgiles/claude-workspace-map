@@ -25,6 +25,8 @@ export interface PlayerControllerDeps {
   findNpcById: (id: string) => NpcInstance | undefined;
   /** Resolve the house an NPC lives in, so the autopilot can route via its entrance. */
   findHouseForNpc: (npc: NpcInstance) => House | undefined;
+  /** Called when the player presses E on the Professor NPC. */
+  onProfessorInteract?: () => void;
 }
 
 /**
@@ -283,6 +285,12 @@ export class PlayerController {
       }
     }
     if (!best) return;
+
+    // Professor NPC → spawn his Claude Code session directly.
+    if (best.def.id === "professor") {
+      this.deps.onProfessorInteract?.();
+      return;
+    }
 
     // P0: awaiting_approval NPCs with pending data get the RPG approval dialogue.
     const hasPending =

@@ -69,8 +69,8 @@ export class NpcManager {
 
     const spriteKey = this.buildCharacterAnimations(
       def.id,
-      "#6b7280",
-      "#fcd9b6",
+      def.hairColor ?? "#6b7280",
+      def.clothesColor ?? "#fcd9b6",
       def.sprite
     );
     const sprite = this.scene.physics.add.sprite(def.x, def.y, spriteKey);
@@ -271,7 +271,7 @@ export class NpcManager {
       npc.sprite.setFlipX(this.charNeedsRightFlip.has(id) && npc.lastDir === "right");
     };
 
-    if (frozenForDialogue) {
+    if (frozenForDialogue || npc.def.static) {
       npc.sprite.setVelocity(0, 0);
       playIdle();
       return;

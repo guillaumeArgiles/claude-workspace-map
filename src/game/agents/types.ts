@@ -23,6 +23,12 @@ export interface NpcDef {
   dialogue: string;
   /** Filename (without extension) under /assets/sprites/. */
   sprite: string;
+  /** Override hair colour for programmatic sprites (hex string). */
+  hairColor?: string;
+  /** Override clothes colour for programmatic sprites (hex string). */
+  clothesColor?: string;
+  /** If true, the NPC stays at its home position and doesn't wander. */
+  static?: boolean;
   /** Populated when the agent is waiting on ExitPlanMode approval. */
   pendingPlan?: string;
   /** Populated when the agent is waiting on AskUserQuestion. */

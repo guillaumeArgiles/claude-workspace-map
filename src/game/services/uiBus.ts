@@ -10,6 +10,8 @@ export interface UiEvents {
   highlight_agent: { id: string };
   /** Tell the sidebar to open the terminal for a given Claude session. */
   open_terminal: { sessionId: string };
+  /** Player pressed E on the Professor NPC — sidebar should spawn the Professor session. */
+  spawn_professor: Record<string, never>;
 }
 
 class UiBus {
