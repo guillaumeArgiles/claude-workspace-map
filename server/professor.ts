@@ -111,7 +111,7 @@ export async function spawnProfessor(agents: AgentState[]): Promise<string> {
   // Give Claude ~1.5 s to start up, then send a prompt so he speaks first
   // without waiting for the user to type anything.
   setTimeout(() => {
-    ptyManager.write(ptyId, "Bonjour ! Que dois-je faire maintenant ?\n");
+    ptyManager.write(ptyId, "Bonjour ! Que dois-je faire maintenant ?\r");
   }, 1500);
 
   return ptyId;

@@ -128,6 +128,7 @@ export class SessionWatcher {
    */
   dismissWhere(predicate: (agent: AgentState) => boolean): void {
     for (const [filePath, tracker] of this.trackers) {
+      if (tracker.agent.cwd.includes(".claude-workspace-map")) continue; // never dismiss professor
       if (predicate(tracker.agent)) {
         this.dismissed.set(tracker.agent.sessionId, tracker.byteOffset);
         this.trackers.delete(filePath);
@@ -208,6 +209,11 @@ export class SessionWatcher {
   }
 
   private async handleAddOrChange(filePath: string): Promise<void> {
+    // Claude encodes the cwd into the project directory path — skip any session
+    // whose JSONL lives under the professor workspace (.claude-workspace-map).
+    // This prevents professor sessions from ever getting a house or dismiss button.
+    if (filePath.includes("claude-workspace-map")) return;
+
     // If the user dismissed this session, only re-show it when new content arrives.
     const sessionId = path.basename(filePath, ".jsonl");
     const dismissedOffset = this.dismissed.get(sessionId);
