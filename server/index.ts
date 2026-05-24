@@ -4,6 +4,7 @@ import path from "node:path";
 import { SessionWatcher } from "./watcher.js";
 import { child } from "./logger.js";
 import { setValidationErrorSink } from "./parser.js";
+import { ptyManager } from "./pty-manager.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 /** MIME types for static file serving (renderer assets in prod). */
@@ -98,6 +99,94 @@ export async function startServer(
         `data: ${JSON.stringify({ type: "snapshot", agents: watcher.list() } satisfies ServerEvent)}\n\n`
       );
       req.on("close", () => sseClients.delete(res));
+      return;
+    }
+
+    // ── PTY / session control ─────────────────────────────────────────────
+
+    // POST /api/sessions — spawn a new Claude session in the given cwd
+    if (req.method === "POST" && url === "/api/sessions") {
+      let body = "";
+      try {
+        for await (const chunk of req) body += chunk;
+        const { cwd, command } = JSON.parse(body) as { cwd: string; command?: string };
+        if (!cwd) throw new Error("cwd is required");
+        const ptyId = ptyManager.spawn(cwd, command);
+        res.writeHead(201, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ptyId }));
+      } catch (err) {
+        log.warn({ err }, "POST /api/sessions error");
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+      return;
+    }
+
+    // POST /api/sessions/:ptyId/write — send text input to a running PTY
+    const writeMatch = url.match(/^\/api\/sessions\/([^/]+)\/write$/);
+    if (req.method === "POST" && writeMatch) {
+      const ptyId = writeMatch[1];
+      let body = "";
+      try {
+        for await (const chunk of req) body += chunk;
+        const { text } = JSON.parse(body) as { text: string };
+        const ok = ptyManager.write(ptyId, text ?? "");
+        res.writeHead(ok ? 200 : 404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok }));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+      return;
+    }
+
+    // GET /api/sessions/:ptyId/output — SSE stream of raw PTY output
+    const outputMatch = url.match(/^\/api\/sessions\/([^/]+)\/output$/);
+    if (req.method === "GET" && outputMatch) {
+      const ptyId = outputMatch[1];
+      const session = ptyManager.get(ptyId);
+      if (!session) {
+        res.writeHead(404);
+        res.end("PTY session not found");
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      // Replay buffered output so the UI doesn't miss anything on connect.
+      if (session.outputBuffer) {
+        res.write(`data: ${JSON.stringify({ chunk: session.outputBuffer })}\n\n`);
+      }
+      const listener = (chunk: string) => {
+        try {
+          res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+        } catch {
+          session.listeners.delete(listener);
+        }
+      };
+      session.listeners.add(listener);
+      req.on("close", () => session.listeners.delete(listener));
+      return;
+    }
+
+    // GET /api/sessions — list active PTY sessions
+    if (req.method === "GET" && url === "/api/sessions") {
+      const list = ptyManager.list().map(({ id, cwd, pid, sessionId, createdAt, exitCode }) => ({
+        id, cwd, pid, sessionId, createdAt, exitCode,
+      }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(list));
+      return;
+    }
+
+    // DELETE /api/sessions/:ptyId — kill a PTY
+    const deleteMatch = url.match(/^\/api\/sessions\/([^/]+)$/);
+    if (req.method === "DELETE" && deleteMatch) {
+      const ok = ptyManager.kill(deleteMatch[1]);
+      res.writeHead(ok ? 200 : 404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok }));
       return;
     }
 

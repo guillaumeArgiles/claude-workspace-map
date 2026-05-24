@@ -51,6 +51,55 @@
       #agent-sidebar li.sub-agent { display: flex; gap: 8px; padding: 4px 6px; }
       #agent-sidebar li.sub-agent .icon { flex: 0 0 24px; width: 24px; height: 24px; background-size: 72px 96px; background-position: -24px 0px; }
       #agent-sidebar li.sub-agent .detail { padding-left: 30px; }
+      /* ── Spawn button in sidebar header ──────────────────────────────── */
+      #agent-sidebar .spawn-btn-header { background: #1e2d3d; border: 1px solid #3b5a80; color: #7dd3fc; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; transition: background 0.12s; }
+      #agent-sidebar .spawn-btn-header:hover { background: #264a68; border-color: #60a5fa; }
+      #agent-sidebar .empty { padding: 16px 14px; font-size: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+      .empty-spawn-btn { background: #1e2d3d; border: 1px solid #3b5a80; color: #7dd3fc; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+      .empty-spawn-btn:hover { background: #264a68; }
+      /* ── SpawnPanel modal ─────────────────────────────────────────────── */
+      #spawn-panel-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 40; display: flex; align-items: center; justify-content: center; }
+      #spawn-panel { background: #111418; border: 1px solid #2c313a; border-radius: 8px; width: 420px; max-width: 92vw; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
+      #spawn-panel header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; }
+      #spawn-panel header h3 { margin: 0; font-size: 14px; font-weight: 700; }
+      #spawn-panel label { font-size: 12px; opacity: 0.65; letter-spacing: 0.03em; text-transform: uppercase; }
+      #spawn-panel input[type="text"] { background: #0d1117; border: 1px solid #2c313a; color: #eee; padding: 8px 10px; border-radius: 5px; font-size: 13px; font-family: ui-monospace, monospace; width: 100%; box-sizing: border-box; outline: none; }
+      #spawn-panel input[type="text"]:focus { border-color: #6366f1; }
+      #spawn-panel .recent-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      #spawn-panel .recent-label { font-size: 11px; opacity: 0.55; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 4px; }
+      #spawn-panel .recent-item { background: #1a1f27; border: 1px solid #2c313a; color: #ccc; padding: 3px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #spawn-panel .recent-item:hover { border-color: #6366f1; color: #eee; }
+      #spawn-panel .recent-item.active { border-color: #6366f1; background: #1e203a; color: #a5b4fc; }
+      #spawn-panel .spawn-error { color: #f87171; font-size: 12px; margin: 0; }
+      #spawn-panel .spawn-actions { display: flex; gap: 8px; justify-content: flex-end; }
+      #spawn-panel .cancel-btn { background: transparent; border: 1px solid #2c313a; color: #aaa; padding: 6px 14px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+      #spawn-panel .cancel-btn:hover { border-color: #555; color: #eee; }
+      #spawn-panel .spawn-btn { background: #4338ca; border: 1px solid #6366f1; color: #eee; padding: 6px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600; }
+      #spawn-panel .spawn-btn:hover:not(:disabled) { background: #4f46e5; }
+      #spawn-panel .spawn-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+      #spawn-panel .close-btn { background: transparent; border: none; color: #888; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 3px; line-height: 1; }
+      #spawn-panel .close-btn:hover { color: #eee; }
+      /* ── TerminalOverlay ──────────────────────────────────────────────── */
+      #terminal-overlay { position: fixed; bottom: 0; right: 0; width: var(--sidebar-w); height: 60vh; z-index: 30; display: flex; flex-direction: column; pointer-events: none; }
+      #terminal-panel { pointer-events: all; display: flex; flex-direction: column; height: 100%; background: #0d1117; border: 1px solid #2c313a; border-bottom: none; border-radius: 8px 8px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.5); overflow: hidden; }
+      #terminal-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #111418; border-bottom: 1px solid #1d2128; flex: 0 0 auto; }
+      #terminal-header .term-title { font-size: 13px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #terminal-header .term-pty-id { font-size: 10px; font-family: ui-monospace, monospace; opacity: 0.4; }
+      #terminal-header .close-btn { background: transparent; border: none; color: #888; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 3px; line-height: 1; }
+      #terminal-header .close-btn:hover { color: #eee; }
+      #terminal-header .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
+      #terminal-header .dot.ok { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+      #terminal-header .dot.ko { background: #ef4444; }
+      #terminal-output { flex: 1; overflow-y: auto; margin: 0; padding: 10px 12px; font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace; font-size: 11.5px; line-height: 1.55; color: #d4d4d4; background: #0d1117; white-space: pre-wrap; word-break: break-word; }
+      #terminal-output .term-empty { opacity: 0.35; font-style: italic; }
+      #terminal-input-row { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-top: 1px solid #1d2128; background: #111418; flex: 0 0 auto; }
+      #terminal-input-row .term-prompt { color: #6366f1; font-size: 16px; font-weight: 700; line-height: 1; }
+      #terminal-input-row input { flex: 1; background: #0d1117; border: 1px solid #2c313a; color: #eee; padding: 5px 8px; border-radius: 4px; font-size: 12px; font-family: ui-monospace, monospace; outline: none; }
+      #terminal-input-row input:focus { border-color: #6366f1; }
+      #terminal-input-row input:disabled { opacity: 0.5; }
+      .term-send-btn { background: #1e2d3d; border: 1px solid #3b5a80; color: #7dd3fc; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+      .term-send-btn:hover:not(:disabled) { background: #264a68; }
+      .term-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     </style>
   </head>
   <body>

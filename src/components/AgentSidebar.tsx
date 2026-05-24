@@ -10,6 +10,25 @@ import {
 } from "../../shared/agent-sprites";
 import { STATUS_COLOR, STATUS_LABEL, statusOrder } from "../../shared/agent-ui";
 import { uiBus } from "../game/services/uiBus";
+import { SpawnPanel } from "./SpawnPanel";
+import { TerminalOverlay } from "./TerminalOverlay";
+
+/** Persist recent cwds in localStorage so SpawnPanel can offer them. */
+function loadRecentCwds(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem("recentCwds") ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentCwds(cwds: string[]) {
+  try {
+    localStorage.setItem("recentCwds", JSON.stringify(cwds));
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
  * One frame of the RPG-Maker sheet (96×128, 3 cols × 4 rows). Frame (col=1,
@@ -34,6 +53,9 @@ interface AgentSidebarProps {
 export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   const [agents, setAgents] = useState<AgentState[]>([]);
   const [connected, setConnected] = useState(false);
+  const [showSpawnPanel, setShowSpawnPanel] = useState(false);
+  const [activePty, setActivePty] = useState<{ ptyId: string; cwd: string } | null>(null);
+  const [recentCwds, setRecentCwds] = useState<string[]>(loadRecentCwds);
 
   useEffect(() => {
     const es = new EventSource("/api/events");
@@ -100,56 +122,105 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
     0
   );
 
+  function handleSpawned(session: { ptyId: string; cwd: string; spawnedAt: number }) {
+    // Update recent cwds (deduplicated, most recent first, capped at 10).
+    setRecentCwds((prev) => {
+      const next = [session.cwd, ...prev.filter((c) => c !== session.cwd)].slice(0, 10);
+      saveRecentCwds(next);
+      return next;
+    });
+    // Open the terminal overlay for the newly spawned session.
+    setActivePty({ ptyId: session.ptyId, cwd: session.cwd });
+  }
+
   if (collapsed) {
     return (
-      <aside id="agent-sidebar" className="collapsed">
-        <button
-          className="collapse-btn"
-          onClick={onToggle}
-          title="Show agents"
-        >
-          ←
-        </button>
-        <span className={`dot ${connected ? "ok" : "ko"}`} />
-        <span className="count-vert">{totalAgents}</span>
-      </aside>
+      <>
+        <aside id="agent-sidebar" className="collapsed">
+          <button
+            className="collapse-btn"
+            onClick={onToggle}
+            title="Show agents"
+          >
+            ←
+          </button>
+          <span className={`dot ${connected ? "ok" : "ko"}`} />
+          <span className="count-vert">{totalAgents}</span>
+        </aside>
+
+        {activePty && (
+          <TerminalOverlay
+            ptyId={activePty.ptyId}
+            cwd={activePty.cwd}
+            onClose={() => setActivePty(null)}
+          />
+        )}
+      </>
     );
   }
 
   return (
-    <aside id="agent-sidebar">
-      <header>
-        <span className={`dot ${connected ? "ok" : "ko"}`} />
-        <h2>Live Claude sessions</h2>
-        <span className="count">
-          {totalAgents}
-          {totalSubs > 0 ? ` · ${totalSubs} sub` : ""}
-        </span>
-        <button
-          className="collapse-btn"
-          onClick={onToggle}
-          title="Collapse"
-        >
-          →
-        </button>
-      </header>
-      <div className="groups">
-        {groups.length === 0 ? (
-          <p className="empty">No active session in the last 30 minutes.</p>
-        ) : (
-          groups.map((g) => (
-            <section key={g.cwd} className="project">
-              <h3 title={g.cwd}>{shortName(g.cwd)}</h3>
-              <ul>
-                {g.agents.map((a) => (
-                  <AgentRow key={a.sessionId} agent={a} />
-                ))}
-              </ul>
-            </section>
-          ))
-        )}
-      </div>
-    </aside>
+    <>
+      <aside id="agent-sidebar">
+        <header>
+          <span className={`dot ${connected ? "ok" : "ko"}`} />
+          <h2>Live Claude sessions</h2>
+          <span className="count">
+            {totalAgents}
+            {totalSubs > 0 ? ` · ${totalSubs} sub` : ""}
+          </span>
+          <button
+            className="spawn-btn-header"
+            onClick={() => setShowSpawnPanel(true)}
+            title="Launch a new Claude session"
+          >
+            ⚡
+          </button>
+          <button
+            className="collapse-btn"
+            onClick={onToggle}
+            title="Collapse"
+          >
+            →
+          </button>
+        </header>
+        <div className="groups">
+          {groups.length === 0 ? (
+            <p className="empty">No active session in the last 30 minutes.<br /><button className="empty-spawn-btn" onClick={() => setShowSpawnPanel(true)}>⚡ Launch Claude</button></p>
+          ) : (
+            groups.map((g) => (
+              <section key={g.cwd} className="project">
+                <h3 title={g.cwd}>{shortName(g.cwd)}</h3>
+                <ul>
+                  {g.agents.map((a) => (
+                    <AgentRow key={a.sessionId} agent={a} />
+                  ))}
+                </ul>
+              </section>
+            ))
+          )}
+        </div>
+      </aside>
+
+      {showSpawnPanel && (
+        <SpawnPanel
+          recentCwds={recentCwds}
+          onClose={() => setShowSpawnPanel(false)}
+          onSpawned={(session) => {
+            setShowSpawnPanel(false);
+            handleSpawned(session);
+          }}
+        />
+      )}
+
+      {activePty && (
+        <TerminalOverlay
+          ptyId={activePty.ptyId}
+          cwd={activePty.cwd}
+          onClose={() => setActivePty(null)}
+        />
+      )}
+    </>
   );
 }
 
