@@ -1,9 +1,18 @@
 import http from "node:http";
 import { SessionWatcher } from "./watcher.js";
 import { child } from "./logger.js";
+import { setValidationErrorSink } from "./parser.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 const log = child("server");
+const parserLog = child("parser");
+
+// Surface JSONL lines that fail Zod validation. Sampled at debug level: a busy
+// session can produce a lot, and the parser is tolerant — we just want a
+// signal when Claude Code's format drifts.
+setValidationErrorSink((reason, raw) => {
+  parserLog.debug({ reason, raw }, "jsonl line failed validation");
+});
 
 const PORT = Number(process.env.PORT ?? 4000);
 

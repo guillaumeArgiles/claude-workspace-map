@@ -25,7 +25,7 @@ But : PoC → outil installable, stable, partageable.
 
 ### Sprint 2 — Types stricts + tests étendus + pathfinding
 
-- [ ] **S2.1** Zod (ou typebox) pour valider chaque ligne JSONL avant parsing
+- [x] **S2.1** Zod pour valider chaque ligne JSONL avant parsing — livré. Schémas dans `server/schemas.ts` (JsonlLine, ContentBlock union, Message). `parseLine` utilise `safeParse` + sink injectable pour la télémétrie (server.ts log debug). Élimine les casts `as Record<string, unknown>` du parser. 4 nouveaux tests prouvent que le sink fire sur garbage / silencieux sur JSON malformé.
 - [ ] **S2.2** Tests sur `server/watcher.ts` (add/change/unlink, byte offset, sub-agents)
 - [x] **S2.3** Strict TS settings (noUnusedLocals, noUnusedParameters, noImplicitReturns) — livré. Inclut aussi `server/` et `shared/` dans `tsconfig.include` (couvre maintenant tout le monorepo, plus juste `src/`). @types/node installé. Fallout fixé : import default `pino` (vs nommé), `import { type FSWatcher }` chokidar, typage explicite des handlers `add`/`change`/`unlink`, dead import `logger` retiré dans `server/index.ts`.
 - [ ] **S2.4** CI GitHub Actions : tsc + vitest + lint sur PR

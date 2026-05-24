@@ -93,7 +93,7 @@ NpcManager reste épais à cause du sprite loader (buildCharacterAnimations + en
 
 | ID | Story | Effort | Notes |
 |---|---|---|---|
-| S2.1 | Zod (ou typebox) pour valider chaque ligne JSONL | 1j | Pose la base de la sécurité runtime |
+| S2.1 | Zod (ou typebox) pour valider chaque ligne JSONL | 1j | **livré** — `server/schemas.ts`, `parseLine` consomme `safeParse`, sink télémétrie injectable, 4 nouveaux tests |
 | S2.2 | Tests `server/watcher.ts` (add/change/unlink, byte offset, sub-agents) | 1j | Le watcher est le 2e composant le plus à risque après parser.ts |
 | S2.3 | Strict TS settings (`noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) | 0.5j | **livré** — étend la couverture tsc à `server/` + `shared/`, fixe 8 erreurs (pino default import, FSWatcher typing, handlers typés) |
 | S2.4 | CI GitHub Actions (tsc + vitest + lint sur PR) | 0.5j | Le repo n'est pas encore public, mais on le prépare |

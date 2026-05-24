@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   parseLine,
   applyToAgentStatus,
@@ -6,6 +6,7 @@ import {
   statusFromTool,
   subAgentChanges,
   lastToolUse,
+  setValidationErrorSink,
 } from "./parser";
 import type { AgentStatus } from "../shared/agent-types";
 
@@ -129,6 +130,45 @@ describe("parseLine", () => {
       })
     );
     expect(parsed!.isSidechain).toBe(true);
+  });
+
+  describe("Zod validation telemetry", () => {
+    afterEach(() => setValidationErrorSink(undefined));
+
+    it("rejects a JSONL line that is not an object (e.g. a bare string)", () => {
+      const calls: Array<{ reason: string; raw: unknown }> = [];
+      setValidationErrorSink((reason, raw) => calls.push({ reason, raw }));
+      expect(parseLine(JSON.stringify("just a string"))).toBeNull();
+      expect(calls).toHaveLength(1);
+      expect(calls[0].raw).toBe("just a string");
+    });
+
+    it("rejects a line missing the required `type` field", () => {
+      const calls: unknown[] = [];
+      setValidationErrorSink(() => calls.push(1));
+      expect(parseLine(JSON.stringify({ timestamp: "x", isSidechain: false }))).toBeNull();
+      expect(calls).toHaveLength(1);
+    });
+
+    it("tolerates lines where `message` has an unexpected shape", () => {
+      // Real-world: system lines sometimes carry `message: ""` instead of
+      // an object. We should still get back a valid ParsedLine.
+      const calls: unknown[] = [];
+      setValidationErrorSink(() => calls.push(1));
+      const parsed = parseLine(
+        JSON.stringify({ type: "system", subtype: "stop_hook_summary", message: "" })
+      );
+      expect(parsed).not.toBeNull();
+      expect(parsed!.isStopHook).toBe(true);
+      expect(calls).toHaveLength(0); // soft validation, not flagged as error
+    });
+
+    it("doesn't fire the sink on malformed JSON (caught earlier)", () => {
+      const calls: unknown[] = [];
+      setValidationErrorSink(() => calls.push(1));
+      expect(parseLine("not json {{{")).toBeNull();
+      expect(calls).toHaveLength(0);
+    });
   });
 });
 

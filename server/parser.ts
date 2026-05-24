@@ -1,4 +1,22 @@
 import type { AgentStatus, SubAgentState } from "../shared/agent-types.js";
+import {
+  JsonlLineSchema,
+  MessageSchema,
+  type JsonlLine,
+  type ContentBlock,
+} from "./schemas.js";
+
+/**
+ * Telemetry sink for lines that fail Zod validation. Tests inject a counter;
+ * the server wires it to the logger so we can spot Claude Code format drift.
+ * Kept module-local + injectable to avoid making the parser depend on pino.
+ */
+let onValidationError: ((reason: string, raw: unknown) => void) | undefined;
+export function setValidationErrorSink(
+  sink: ((reason: string, raw: unknown) => void) | undefined
+): void {
+  onValidationError = sink;
+}
 
 /**
  * Categorise a tool name into a Claude agent status.
@@ -110,14 +128,24 @@ export interface ParsedLine {
  * (queue-operation, attachment, ai-title, last-prompt …).
  */
 export function parseLine(raw: string): ParsedLine | null {
-  let obj: Record<string, unknown>;
+  let json: unknown;
   try {
-    obj = JSON.parse(raw);
+    json = JSON.parse(raw);
   } catch {
     return null;
   }
 
-  const type = String(obj.type ?? "");
+  // Validate the shape with Zod. Failures are non-fatal: we still return null
+  // so the watcher skips the line, but we surface the reason so the operator
+  // can spot Claude Code format drift early.
+  const result = JsonlLineSchema.safeParse(json);
+  if (!result.success) {
+    onValidationError?.(result.error.message, json);
+    return null;
+  }
+  const line: JsonlLine = result.data;
+
+  const type = line.type;
   if (
     type === "queue-operation" ||
     type === "ai-title" ||
@@ -127,9 +155,9 @@ export function parseLine(raw: string): ParsedLine | null {
     return null;
   }
 
-  const timestamp = obj.timestamp ? Date.parse(String(obj.timestamp)) : Date.now();
-  const isSidechain = Boolean(obj.isSidechain);
-  const cwd = typeof obj.cwd === "string" ? obj.cwd : undefined;
+  const timestamp = line.timestamp ? Date.parse(line.timestamp) : Date.now();
+  const isSidechain = Boolean(line.isSidechain);
+  const cwd = line.cwd;
   const toolUses: AssistantToolUse[] = [];
   const toolResultIds: string[] = [];
   let isStopHook = false;
@@ -137,34 +165,36 @@ export function parseLine(raw: string): ParsedLine | null {
   let systemSubtype: string | undefined;
   let parentToolUseId: string | undefined;
 
+  // `message` shape varies (object for assistant/user, sometimes a bare string
+  // on system lines). Validate only when we need the content blocks.
+  const messageResult = MessageSchema.safeParse(line.message);
+  const content: ContentBlock[] = messageResult.success
+    ? messageResult.data.content ?? []
+    : [];
+
   if (type === "system") {
-    systemSubtype =
-      typeof obj.subtype === "string" ? obj.subtype : undefined;
+    systemSubtype = line.subtype;
   } else if (type === "assistant") {
-    const message = obj.message as { content?: unknown } | undefined;
-    const content = Array.isArray(message?.content) ? message!.content : [];
-    for (const block of content as Array<Record<string, unknown>>) {
-      const bt = String(block.type ?? "");
-      if (bt === "tool_use") {
+    for (const block of content) {
+      // Narrow via the discriminator since z.union doesn't auto-narrow.
+      if (block.type === "tool_use") {
+        const b = block as { id?: string; name?: string; input?: unknown };
         toolUses.push({
-          toolUseId: String(block.id ?? ""),
-          name: String(block.name ?? ""),
-          input: block.input,
+          toolUseId: b.id ?? "",
+          name: b.name ?? "",
+          input: b.input,
         });
-      } else if (bt === "text") {
+      } else if (block.type === "text") {
         hasText = true;
       }
     }
   } else if (type === "user") {
-    const message = obj.message as { content?: unknown } | undefined;
-    const content = Array.isArray(message?.content) ? message!.content : [];
-    for (const block of content as Array<Record<string, unknown>>) {
-      const bt = String(block.type ?? "");
-      if (bt === "tool_result") {
-        toolResultIds.push(String(block.tool_use_id ?? ""));
-        if (typeof block.tool_use_id === "string") {
-          parentToolUseId = block.tool_use_id;
-        }
+    for (const block of content) {
+      if (block.type === "tool_result") {
+        const b = block as { tool_use_id?: string };
+        const id = b.tool_use_id ?? "";
+        toolResultIds.push(id);
+        if (id) parentToolUseId = id;
       }
     }
   }
@@ -172,7 +202,7 @@ export function parseLine(raw: string): ParsedLine | null {
   if (systemSubtype === "stop_hook_summary") isStopHook = true;
 
   return {
-    raw: obj,
+    raw: json,
     type,
     timestamp,
     isSidechain,
