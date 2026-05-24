@@ -5,7 +5,7 @@ import { SessionWatcher } from "./watcher.js";
 import { child } from "./logger.js";
 import { setValidationErrorSink } from "./parser.js";
 import { ptyManager } from "./pty-manager.js";
-import { streamProfessorResponse, professorAvailable, type ProfessorRequest } from "./professor.js";
+import { spawnProfessor, PROFESSOR_DIR } from "./professor.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 /** MIME types for static file serving (renderer assets in prod). */
@@ -255,34 +255,17 @@ export async function startServer(
       return;
     }
 
-    // GET /api/professor/status — indique si ANTHROPIC_API_KEY est configurée
-    if (req.method === "GET" && url === "/api/professor/status") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ available: professorAvailable }));
-      return;
-    }
-
-    // POST /api/professor — streaming conversation with the Professeur NPC.
-    // Body: { messages: [{role, content}][] }  (full history, client-managed)
-    // Response: SSE stream  data: {chunk} … data: {done:true}
-    if (req.method === "POST" && url === "/api/professor") {
-      let body = "";
+    // POST /api/professor/spawn — crée le CLAUDE.md avec le snapshot agents
+    // et spawne une session Claude Code dans le dossier dédié du Professeur.
+    // Retourne { ptyId, cwd } comme POST /api/sessions.
+    if (req.method === "POST" && url === "/api/professor/spawn") {
       try {
-        for await (const chunk of req) body += chunk;
-        const payload = JSON.parse(body) as ProfessorRequest;
-        res.writeHead(200, {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        });
-        await streamProfessorResponse(payload, watcher.list(), (data) => {
-          try { res.write(data); } catch { /* client disconnected */ }
-        });
-        res.end();
+        const ptyId = await spawnProfessor(watcher.list());
+        res.writeHead(201, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ptyId, cwd: PROFESSOR_DIR }));
       } catch (err) {
-        if (!res.headersSent) {
-          res.writeHead(400, { "Content-Type": "application/json" });
-        }
+        log.warn({ err }, "POST /api/professor/spawn error");
+        res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: String(err) }));
       }
       return;
