@@ -192,4 +192,6 @@ See [CREDITS.md](CREDITS.md) for the full attribution list.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[AGPL v3](LICENSE) — free to use, fork, and contribute. If you run a modified version as a network service, you must publish your source. Commercial licensing available — contact the author.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
