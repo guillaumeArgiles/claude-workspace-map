@@ -1,8 +1,25 @@
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
 import { SessionWatcher } from "./watcher.js";
 import { child } from "./logger.js";
 import { setValidationErrorSink } from "./parser.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
+
+/** MIME types for static file serving (renderer assets in prod). */
+const MIME: Record<string, string> = {
+  ".html": "text/html",
+  ".js":   "application/javascript",
+  ".mjs":  "application/javascript",
+  ".css":  "text/css",
+  ".png":  "image/png",
+  ".jpg":  "image/jpeg",
+  ".svg":  "image/svg+xml",
+  ".json": "application/json",
+  ".ico":  "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2":"font/woff2",
+};
 
 const log = child("server");
 const parserLog = child("parser");
@@ -24,7 +41,17 @@ setValidationErrorSink((reason, raw) => {
  * - `electron/main.ts` (Electron app) — on app ready
  * - `server/start.ts` (standalone dev) — via `npm run server`
  */
-export async function startServer(port: number): Promise<() => Promise<void>> {
+/**
+ * @param port      HTTP port to listen on.
+ * @param staticRoot  Optional path to a directory of static files to serve
+ *                    (used in Electron production to serve dist/ over HTTP so
+ *                    that Phaser's XHR loader and React API calls resolve to
+ *                    localhost instead of broken file:// paths inside the ASAR).
+ */
+export async function startServer(
+  port: number,
+  staticRoot?: string
+): Promise<() => Promise<void>> {
   const sseClients = new Set<http.ServerResponse>();
 
   function broadcast(event: ServerEvent): void {
@@ -86,6 +113,37 @@ export async function startServer(port: number): Promise<() => Promise<void>> {
         log.warn({ err }, "/api/hook bad payload");
         res.writeHead(400, { "Content-Type": "text/plain" });
         res.end("Bad JSON");
+      }
+      return;
+    }
+
+    // ── Static file serving (Electron production only) ──────────────────
+    // In dev, Vite handles this. In Electron prod, we serve dist/ over HTTP
+    // so Phaser's XHR loader and the React API calls both hit localhost:PORT
+    // instead of broken file:// paths inside the ASAR.
+    if (req.method === "GET" && staticRoot) {
+      // Strip query string, resolve to staticRoot, prevent path traversal
+      const filePath = url.split("?")[0];
+      const safePath = path.normalize(filePath).replace(/^(\.\.[/\\])+/, "");
+      // "/" → index.html, everything else → literal path
+      const target = safePath === "/" ? "index.html" : safePath.replace(/^\//, "");
+      const full = path.join(staticRoot, target);
+      const ext = path.extname(full);
+      const mime = MIME[ext] ?? "application/octet-stream";
+      try {
+        const data = fs.readFileSync(full);
+        res.writeHead(200, { "Content-Type": mime });
+        res.end(data);
+      } catch {
+        // File not found — fall through to SPA fallback (index.html)
+        try {
+          const data = fs.readFileSync(path.join(staticRoot, "index.html"));
+          res.writeHead(200, { "Content-Type": "text/html" });
+          res.end(data);
+        } catch {
+          res.writeHead(404);
+          res.end("Not found");
+        }
       }
       return;
     }

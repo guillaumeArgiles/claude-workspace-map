@@ -18,6 +18,9 @@ const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const PRELOAD = path.join(__dirname, "../preload/index.js");
 const RENDERER_DIST = path.join(__dirname, "../../dist");
 
+/** Port used in production (set before createWindow so loadURL can reference it). */
+let prodPort = 4000;
+
 let stopServer: (() => Promise<void>) | undefined;
 
 // ─── Auto-updater ────────────────────────────────────────────────────────────
@@ -89,11 +92,13 @@ function createWindow(): BrowserWindow {
   });
 
   if (VITE_DEV_SERVER_URL) {
+    // Dev: Vite dev server handles assets + proxies /api
     win.loadURL(VITE_DEV_SERVER_URL);
-    // Open DevTools automatically in dev mode
     win.webContents.openDevTools({ mode: "detach" });
   } else {
-    win.loadFile(path.join(RENDERER_DIST, "index.html"));
+    // Prod: load via HTTP so Phaser's XHR loader and React's /api calls both
+    // hit localhost — file:// URLs break relative asset loading inside ASAR.
+    win.loadURL(`http://localhost:${prodPort}`);
   }
 
   // Prevent in-app navigation for external URLs — open in OS browser instead
@@ -114,10 +119,13 @@ function createWindow(): BrowserWindow {
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-  const port = Number(process.env["PORT"] ?? 4000);
+  prodPort = Number(process.env["PORT"] ?? 4000);
 
   try {
-    stopServer = await startServer(port);
+    // In prod, pass RENDERER_DIST so the server also serves the renderer's
+    // static files over HTTP (fixes Phaser XHR + React /api calls in ASAR).
+    const staticRoot = VITE_DEV_SERVER_URL ? undefined : RENDERER_DIST;
+    stopServer = await startServer(prodPort, staticRoot);
   } catch (err) {
     // In dev, the standalone `npm run server` might already be running on
     // this port. Log and continue — the window will proxy to it.
