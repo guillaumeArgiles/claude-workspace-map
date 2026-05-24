@@ -60,6 +60,13 @@ export class NpcManager {
   // ----- Spawn / destroy -----
 
   spawn(def: NpcDef): NpcInstance {
+    // Snap the desired spawn position to the nearest walkable nav-grid cell so
+    // agents never materialise inside furniture collision rectangles.
+    if (this.navGrid) {
+      const safe = this.navGrid.snapToWalkable(def.x, def.y);
+      if (safe) def = { ...def, x: safe.x, y: safe.y };
+    }
+
     const spriteKey = this.buildCharacterAnimations(
       def.id,
       "#6b7280",

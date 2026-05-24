@@ -105,6 +105,11 @@ export class MapScene extends Phaser.Scene {
     this.playerController.setNavGrid(navGrid);
     this.npcManager.setNavGrid(navGrid);
 
+    // Physics world bounds — must match the map, not the canvas size.
+    // Without this, setCollideWorldBounds(true) clamps to the RESIZE canvas
+    // width and blocks movement before the right/bottom edge of the map.
+    this.physics.world.setBounds(0, 0, GRID.width, GRID.height);
+
     // Player (sprite + keyboard + autopilot).
     const player = this.playerController.init({
       x: GRID.width / 2,
@@ -117,12 +122,11 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.setZoom(CAMERA_ZOOM);
     this.cameras.main.startFollow(player, true, 0.12, 0.12);
 
-    // Re-clamp camera bounds whenever the canvas is resized (sidebar toggle,
-    // window resize). Without this call the camera can drift outside the map
-    // after a resize event in RESIZE scale mode.
+    // Re-clamp camera + physics bounds whenever the canvas is resized.
     this.scale.on(
       Phaser.Scale.Events.RESIZE,
       () => {
+        this.physics.world.setBounds(0, 0, GRID.width, GRID.height);
         this.cameras.main.setBounds(0, 0, GRID.width, GRID.height);
         this.cameras.main.setZoom(CAMERA_ZOOM);
       },
