@@ -116,6 +116,19 @@ export class AgentSyncer {
     return undefined;
   }
 
+  /**
+   * True when no agent is in an urgent state (awaiting_approval or blocked).
+   * Used to decide whether to show the "talk to Professor" invitation glyph.
+   */
+  allCalm(): boolean {
+    if (this.teacherNpcs.size === 0) return true;
+    for (const npc of this.teacherNpcs.values()) {
+      const s = npc.def.status;
+      if (s === "awaiting_approval" || s === "blocked") return false;
+    }
+    return true;
+  }
+
   // ----- Internal: agent lifecycle -----
 
   private spawnAgent(agent: AgentState): void {

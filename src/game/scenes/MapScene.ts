@@ -27,6 +27,7 @@ export class MapScene extends Phaser.Scene {
   private previewGrid = false;
   private debugMode = false;
   private statusText?: Phaser.GameObjects.Text;
+  private professorGlyph?: Phaser.GameObjects.Text;
 
   // Managers
   private collision = new CollisionLayer(this);
@@ -157,7 +158,7 @@ export class MapScene extends Phaser.Scene {
 
     // The Professor — a static NPC at the centre of the map. Always present,
     // interacting with him (E key) spawns his dedicated Claude Code session.
-    this.npcManager.spawn({
+    const professorNpc = this.npcManager.spawn({
       id: "professor",
       name: "Le Professeur",
       x: GRID.width / 2,
@@ -166,6 +167,24 @@ export class MapScene extends Phaser.Scene {
       interactLabel: "parler au Professeur",
       sprite: "profesor",
       static: true,
+    });
+
+    // Floating 💬 glyph above the Professor — pulses gently when all agents
+    // are calm, inviting the player to come chat.
+    const glyphBaseY = professorNpc.sprite.y - 62;
+    this.professorGlyph = this.add
+      .text(professorNpc.sprite.x, glyphBaseY, "💬", { fontSize: "20px" })
+      .setOrigin(0.5, 1)
+      .setDepth(layerDepth.OVERLAYS + 5000)
+      .setVisible(false);
+
+    this.tweens.add({
+      targets: this.professorGlyph,
+      y: glyphBaseY - 9,
+      duration: 850,
+      ease: Phaser.Math.Easing.Sine.InOut,
+      yoyo: true,
+      repeat: -1,
     });
 
     this.agentSyncer.start();
@@ -191,6 +210,9 @@ export class MapScene extends Phaser.Scene {
     const now = this.time.now;
     this.npcManager.updateAll(now, this.dialogue.openNpc);
     this.agentSyncer.tickDespawns(now);
+
+    // Show the 💬 invitation above Professor when no agent needs urgent attention.
+    this.professorGlyph?.setVisible(this.agentSyncer.allCalm());
   }
 
   /** Thin debug overlay drawing the 20×12 logical grid above the map. */
