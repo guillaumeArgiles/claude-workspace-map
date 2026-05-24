@@ -434,7 +434,7 @@ function AgentRow({
 
       {/* Inline approval widget — shown when ExitPlanMode or AskUserQuestion is pending */}
       {hasPending && (
-        <PendingApprovalWidget agent={agent} onOpenTerminal={onClick} />
+        <PendingApprovalWidget agent={agent} pty={pty} onOpenTerminal={onClick} />
       )}
 
       {liveSubs.length > 0 && (
@@ -455,21 +455,27 @@ function AgentRow({
  */
 function PendingApprovalWidget({
   agent,
+  pty,
   onOpenTerminal,
 }: {
   agent: AgentState;
+  pty?: ActivePty;
   onOpenTerminal: () => void;
 }) {
+  // If no PTY is open for this agent, it was started outside FleetView.
+  // We can't write to its stdin — just tell the user where to look.
+  const canInteract = !!pty;
+
   if (agent.pendingPlan) {
-    return <PlanWidget plan={agent.pendingPlan} onOpen={onOpenTerminal} />;
+    return <PlanWidget plan={agent.pendingPlan} canInteract={canInteract} onOpen={onOpenTerminal} />;
   }
   if (agent.pendingQuestions && agent.pendingQuestions.length > 0) {
-    return <QuestionsWidget questions={agent.pendingQuestions} onOpen={onOpenTerminal} />;
+    return <QuestionsWidget questions={agent.pendingQuestions} canInteract={canInteract} onOpen={onOpenTerminal} />;
   }
   return null;
 }
 
-function PlanWidget({ plan, onOpen }: { plan: string; onOpen: () => void }) {
+function PlanWidget({ plan, canInteract, onOpen }: { plan: string; canInteract: boolean; onOpen: () => void }) {
   const lines = plan.split("\n").filter((l) => l.trim());
   const title = (lines[0] ?? "Plan").replace(/^#+\s*/, "");
   // Grab up to 3 body lines as a preview, skip further headings.
@@ -484,9 +490,15 @@ function PlanWidget({ plan, onOpen }: { plan: string; onOpen: () => void }) {
       </div>
       {preview && <p className="approval-preview">{preview}{preview.length >= 140 ? "…" : ""}</p>}
       <div className="approval-actions">
-        <button className="approval-btn" onClick={onOpen}>
-          Open Terminal to Approve
-        </button>
+        {canInteract ? (
+          <button className="approval-btn" onClick={onOpen}>
+            Répondre dans le terminal
+          </button>
+        ) : (
+          <span className="approval-external-hint">
+            ↗ Réponds dans ton terminal Claude Code
+          </span>
+        )}
       </div>
     </div>
   );
@@ -494,9 +506,11 @@ function PlanWidget({ plan, onOpen }: { plan: string; onOpen: () => void }) {
 
 function QuestionsWidget({
   questions,
+  canInteract,
   onOpen,
 }: {
   questions: PendingQuestion[];
+  canInteract: boolean;
   onOpen: () => void;
 }) {
   const q = questions[0];
@@ -521,9 +535,15 @@ function QuestionsWidget({
         <p className="approval-more">+{questions.length - 1} more question{questions.length > 2 ? "s" : ""}</p>
       )}
       <div className="approval-actions">
-        <button className="approval-btn" onClick={onOpen}>
-          Open Terminal to Answer
-        </button>
+        {canInteract ? (
+          <button className="approval-btn" onClick={onOpen}>
+            Répondre dans le terminal
+          </button>
+        ) : (
+          <span className="approval-external-hint">
+            ↗ Réponds dans ton terminal Claude Code
+          </span>
+        )}
       </div>
     </div>
   );
