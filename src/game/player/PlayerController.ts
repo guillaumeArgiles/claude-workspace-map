@@ -11,6 +11,7 @@ import type { Direction, NpcInstance } from "../agents/types";
 import type { NpcManager } from "../agents/NpcManager";
 import type { DialogueUI } from "../ui/DialogueUI";
 import type { RPGApprovalUI } from "../ui/RPGApprovalUI";
+import type { RPGAgentMenuUI } from "../ui/RPGAgentMenuUI";
 import type { NavGrid } from "../world/NavGrid";
 
 interface AutoWalkState {
@@ -38,6 +39,7 @@ export class PlayerController {
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private interactKey!: Phaser.Input.Keyboard.Key;
+  private menuKey!: Phaser.Input.Keyboard.Key;
   private lastDir: Direction = "down";
   private autoWalk?: AutoWalkState;
   private navGrid?: NavGrid;
@@ -47,6 +49,7 @@ export class PlayerController {
     private readonly npcManager: NpcManager,
     private readonly dialogue: DialogueUI,
     private readonly approvalUI: RPGApprovalUI,
+    private readonly agentMenu: RPGAgentMenuUI,
     private readonly deps: PlayerControllerDeps
   ) {}
 
@@ -78,12 +81,16 @@ export class PlayerController {
     this.interactKey = this.scene.input.keyboard!.addKey(
       Phaser.Input.Keyboard.KeyCodes.E
     );
+    this.menuKey = this.scene.input.keyboard!.addKey(
+      Phaser.Input.Keyboard.KeyCodes.SPACE
+    );
     // Allow DOM inputs (chat, sidebar) to receive key events without Phaser
     // calling preventDefault() on them. Phaser's internal key state tracking
     // continues to work normally — player movement and E-key interactions are
     // unaffected.
     this.scene.input.keyboard!.disableGlobalCapture();
     this.approvalUI.init();
+    this.agentMenu.init();
 
     return sprite;
   }
@@ -186,8 +193,10 @@ export class PlayerController {
     );
 
     this.approvalUI.update();
+    this.agentMenu.update();
     this.updateNearestNpc();
     this.updateDialogueInput();
+    this.updateMenuInput();
   }
 
   /**
@@ -263,6 +272,34 @@ export class PlayerController {
       }
     }
     this.dialogue.setNearest(best);
+  }
+
+  private updateMenuInput(): void {
+    // Other modal UIs absorb their own keys — don't double-handle Space.
+    if (this.approvalUI.isOpen()) return;
+    if (this.agentMenu.isOpen()) return;
+
+    if (!Phaser.Input.Keyboard.JustDown(this.menuKey)) return;
+
+    // Re-evaluate the nearest NPC each press so Space always targets the freshest one.
+    let best: NpcInstance | undefined;
+    let bestDist = INTERACTION_RADIUS;
+    for (const npc of this.npcManager.npcs) {
+      const d = Math.hypot(
+        npc.sprite.x - this.player.x,
+        npc.sprite.y - this.player.y
+      );
+      if (d < bestDist) {
+        bestDist = d;
+        best = npc;
+      }
+    }
+    if (!best) return;
+    if (best.def.id === "professor") return; // Professor uses E only.
+
+    // If a speech bubble is open on this NPC, close it before showing the menu.
+    if (this.dialogue.isOpen()) this.dialogue.close();
+    this.agentMenu.open(best);
   }
 
   private updateDialogueInput(): void {

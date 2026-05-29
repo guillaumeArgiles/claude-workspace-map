@@ -16,6 +16,7 @@ import {
 } from "../world/CollisionLayer";
 import { NavGrid } from "../world/NavGrid";
 import { RPGApprovalUI } from "../ui/RPGApprovalUI";
+import { RPGAgentMenuUI } from "../ui/RPGAgentMenuUI";
 
 const BACKGROUND_KEY = "workspace-background";
 
@@ -35,6 +36,15 @@ export class MapScene extends Phaser.Scene {
   private npcManager = new NpcManager(this);
   private dialogue = new DialogueUI(this);
   private approvalUI = new RPGApprovalUI(this);
+  // The player sprite is created lazily inside playerController.init(), so we
+  // pass a getter instead of the sprite directly — this avoids a chicken/egg
+  // between fields initialized at class-construction time. Explicit type
+  // annotation breaks the TS inference cycle with playerController below.
+  private agentMenu: RPGAgentMenuUI = new RPGAgentMenuUI(
+    this,
+    this.npcManager,
+    (): Phaser.Physics.Arcade.Sprite => this.playerController.sprite
+  );
   private agentSyncer = new AgentSyncer(this, this.npcManager, this.dialogue, {
     onStatusChange: (text, severity) => {
       if (!this.statusText) return;
@@ -45,11 +55,12 @@ export class MapScene extends Phaser.Scene {
       );
     },
   });
-  private playerController = new PlayerController(
+  private playerController: PlayerController = new PlayerController(
     this,
     this.npcManager,
     this.dialogue,
     this.approvalUI,
+    this.agentMenu,
     {
       findNpcById: (id) => this.agentSyncer.findNpcById(id),
       findHouseForNpc: (npc) => this.agentSyncer.findHouseForNpc(npc),

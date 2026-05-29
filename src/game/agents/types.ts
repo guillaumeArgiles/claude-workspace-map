@@ -17,6 +17,9 @@ export interface NpcDef {
   currentToolDetail?: string;
   /** For students: id of the teacher they're spawned by. */
   parentId?: string;
+  /** Working directory of the agent — used as a fallback when looking up the PTY by cwd
+   *  if the sessionId-based lookup fails (e.g. user spawned a fresh session via the menu). */
+  cwd?: string;
   x: number;
   y: number;
   /** Fallback dialogue line shown if no live tool detail is available. */

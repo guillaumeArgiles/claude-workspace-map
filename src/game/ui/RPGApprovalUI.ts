@@ -50,18 +50,22 @@ export class RPGApprovalUI {
   }
 
   open(npc: NpcInstance): void {
+    const wasOpen = this.openFor !== undefined;
     this.close();
     this.openFor = npc;
     this.ptyId = undefined;
     this.render(npc);
+    if (!wasOpen) uiBus.emit("modal_open_changed", { open: true });
     void this.fetchPty(npc.def.id);
   }
 
   close(): void {
+    const wasOpen = this.openFor !== undefined;
     this.container?.destroy();
     this.container = undefined;
     this.openFor = undefined;
     this.ptyId = undefined;
+    if (wasOpen) uiBus.emit("modal_open_changed", { open: false });
   }
 
   update(): void {

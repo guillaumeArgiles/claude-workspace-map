@@ -49,10 +49,11 @@ function spriteStyle(spriteName: string): React.CSSProperties {
 interface AgentSidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  onOpenSettings: () => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
-export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
+export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSidebarProps) {
   const [agents, setAgents] = useState<AgentState[]>([]);
   const [connected, setConnected] = useState(false);
   const [ptySessions, setPtySessions] = useState<ActivePty[]>([]);
@@ -322,12 +323,29 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   /** Index into the flat agent list for Tab cycling. */
   const cycleIdxRef = useRef(0);
+  /** Refcount of currently-open Phaser modals (agent menu, approval panel).
+   *  When > 0, sidebar shortcuts (1/2/3/N/P/Tab/Esc) are suspended so the
+   *  player can use the same keys inside the modal without side effects. */
+  const modalDepthRef = useRef(0);
   /** Always-current snapshot of reactive values used inside the stable handler. */
   const kbRef = useRef({ groups, ptySessions, inactiveCount });
   kbRef.current = { groups, ptySessions, inactiveCount };
 
+  // Track modal open/close events from Phaser (RPGAgentMenuUI, RPGApprovalUI).
+  useEffect(() => {
+    const onModalChange = ({ open }: { open: boolean }) => {
+      modalDepthRef.current = Math.max(0, modalDepthRef.current + (open ? 1 : -1));
+    };
+    uiBus.on("modal_open_changed", onModalChange);
+    return () => uiBus.off("modal_open_changed", onModalChange);
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Phaser-side modal is up — let the player drive the menu without
+      // triggering the sidebar's house-jump / spawn / cycle shortcuts.
+      if (modalDepthRef.current > 0) return;
+
       // Never fire while the user is typing in a form field or the spawn panel.
       const t = e.target as HTMLElement;
       if (
@@ -470,6 +488,13 @@ export function AgentSidebar({ collapsed, onToggle }: AgentSidebarProps) {
               🔔
             </button>
           )}
+          <button
+            className="settings-btn-header"
+            onClick={onOpenSettings}
+            title="Settings"
+          >
+            ⚙
+          </button>
           <button className="collapse-btn" onClick={onToggle} title="Collapse">→</button>
         </header>
 

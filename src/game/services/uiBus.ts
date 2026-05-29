@@ -12,6 +12,13 @@ export interface UiEvents {
   open_terminal: { sessionId: string };
   /** Player pressed E on the Professor NPC — sidebar should spawn the Professor session. */
   spawn_professor: Record<string, never>;
+  /**
+   * Fired by any Phaser-side modal (agent menu, approval panel) to tell the
+   * sidebar to suspend its global keyboard shortcuts. `open=true` when the
+   * modal opens, `open=false` when it closes. Multiple modals are coalesced
+   * by the sidebar via a refcount.
+   */
+  modal_open_changed: { open: boolean };
 }
 
 class UiBus {

@@ -353,6 +353,7 @@ export class AgentSyncer {
       status: agent.status,
       currentTool: agent.currentTool,
       currentToolDetail: agent.currentToolDetail,
+      cwd: agent.cwd,
       x: pos.x,
       y: pos.y,
       sprite: TEACHER_SPRITES[spriteIdx],
