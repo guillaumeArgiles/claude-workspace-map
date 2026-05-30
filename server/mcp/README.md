@@ -5,8 +5,8 @@ n'importe quel client MCP via le standard [Model Context Protocol](https://model
 
 ## Statut
 
-- **Spike** ✅ — `list_agents` opérationnel (étape 1 de la roadmap MCP, cf [BACKLOG.md](../../docs/BACKLOG.md))
-- **Impl complète** à venir : `spawn_agent`, `send_message`, `kill_agent`
+- **Spike** ✅ — `list_agents` opérationnel
+- **Impl complète** ✅ — 5 tools : list, get_status, spawn, send_message, kill (13 specs vitest sur le bridge)
 - **Wire Professeur** à venir : remplacer les `pty.write` directs par des appels MCP
 
 ## Architecture
@@ -59,12 +59,18 @@ sous le préfixe `mcp__claude-workspace-map__list_agents` (et autres à venir).
 
 ## Tools disponibles
 
-| Tool | Description | Inputs | Statut |
-|---|---|---|---|
-| `list_agents` | Snapshot des sessions Claude Code actives | aucun | ✅ spike |
-| `spawn_agent` | Lance une nouvelle session Claude dans un cwd | `cwd`, `prompt?` | ⏳ TB.7.B |
-| `send_message` | Écrit du texte dans un PTY existant | `sessionId`, `text` | ⏳ TB.7.B |
-| `kill_agent` | Termine une session | `sessionId` | ⏳ TB.7.B |
+| Tool | Description | Inputs |
+|---|---|---|
+| `list_agents` | Snapshot compact de toutes les sessions actives | aucun |
+| `get_agent_status` | Détail complet d'une session par sessionId | `sessionId` |
+| `spawn_agent` | Lance une nouvelle session Claude dans un cwd (optionnellement avec un prompt initial envoyé après 1.5s) | `cwd`, `prompt?` |
+| `send_message` | Écrit du texte dans une session existante (terminer par `\r` pour valider) | `sessionId`, `text` |
+| `kill_agent` | Termine une session (kill du PTY) | `sessionId` |
+
+**Note** : `send_message` et `kill_agent` échouent si la session n'est pas
+liée à un PTY FleetView (sessions Claude lancées hors de l'app : "session
+externe"). Le link sessionId→ptyId est établi par le watcher JSONL au moment
+où Claude crée son fichier — donc post-spawn et post-premier-input.
 
 ## Test rapide en CLI
 
