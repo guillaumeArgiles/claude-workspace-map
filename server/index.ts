@@ -1,6 +1,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SessionWatcher } from "./watcher.js";
 import { child } from "./logger.js";
 import { setValidationErrorSink } from "./parser.js";
@@ -8,6 +9,7 @@ import { ptyManager } from "./pty-manager.js";
 import { spawnProfessor, PROFESSOR_DIR } from "./professor.js";
 import { readConfig, writeConfig } from "./config-store.js";
 import { aggregateStats } from "./stats-aggregator.js";
+import { createMcpServer } from "./mcp/server.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 /** MIME types for static file serving (renderer assets in prod). */
@@ -334,6 +336,46 @@ export async function startServer(
       } catch (err) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: String(err) }));
+      }
+      return;
+    }
+
+    // ── MCP server (streamable HTTP transport, stateless) ───────────────
+    // Expose les tools FleetView au standard Model Context Protocol. Tout
+    // client MCP (Claude Code, Claude Desktop, etc.) peut s'y brancher via
+    // `{ "url": "http://localhost:PORT/mcp" }` dans son config — pas de
+    // subprocess à lancer, pas de path à dériver.
+    //
+    // Stateless mode : une instance fresh par requête, pas de session
+    // continuity. Suffisant pour Claude Code (chaque tool call est
+    // indépendant) et plus simple à raisonner.
+    if (req.method === "POST" && url === "/mcp") {
+      let body = "";
+      try {
+        for await (const chunk of req) body += chunk;
+        const parsedBody = body ? JSON.parse(body) : undefined;
+        const mcpServer = createMcpServer();
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined, // stateless
+        });
+        await mcpServer.connect(transport);
+        await transport.handleRequest(req, res, parsedBody);
+        res.on("close", () => {
+          transport.close().catch(() => {});
+          mcpServer.close().catch(() => {});
+        });
+      } catch (err) {
+        log.warn({ err }, "/mcp request failed");
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: { code: -32603, message: String(err) },
+              id: null,
+            })
+          );
+        }
       }
       return;
     }

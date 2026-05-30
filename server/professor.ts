@@ -13,7 +13,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { fileURLToPath } from "node:url";
 import type { AgentState } from "../shared/agent-types.js";
 import { ptyManager } from "./pty-manager.js";
 import { readConfig } from "./config-store.js";
@@ -27,25 +26,15 @@ export const PROFESSOR_DIR = path.join(
   "professor"
 );
 
-/**
- * Chemin absolu vers l'entrée du MCP server, dérivé de l'emplacement de ce
- * fichier (en dev : `/.../server/professor.ts` → `/.../server/mcp/main.ts`).
- *
- * NOTE packaging : en build Electron, ce chemin pointera dans l'ASAR — et
- * tsx ne sera plus disponible. À résoudre quand on packagera (extraire main.js
- * compilé en dehors de l'ASAR, ou utiliser node + js pré-build).
- */
-const MCP_SERVER_ENTRY = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "mcp",
-  "main.ts"
-);
-
 // ── .mcp.json template ────────────────────────────────────────────────────────
 
 /**
  * Configuration MCP injectée dans le dossier du Professeur. Claude Code la
  * détecte au boot et propose les tools `claude-workspace-map__*` au modèle.
+ *
+ * Transport HTTP via le endpoint `/mcp` du serveur FleetView lui-même — pas
+ * de subprocess à lancer, pas de path absolu à dériver, marche identique en
+ * dev et en packaging Electron. Le port vient de la config courante.
  *
  * Note sécurité Claude Code : à la première détection d'un nouveau .mcp.json,
  * l'utilisateur reçoit un prompt pour autoriser le serveur. C'est volontaire
@@ -55,9 +44,8 @@ function buildMcpConfig(port: number): string {
   const config = {
     mcpServers: {
       "claude-workspace-map": {
-        command: "npx",
-        args: ["tsx", MCP_SERVER_ENTRY],
-        env: { FLEETVIEW_PORT: String(port) },
+        type: "http",
+        url: `http://localhost:${port}/mcp`,
       },
     },
   };
@@ -191,7 +179,7 @@ export async function spawnProfessor(agents: AgentState[]): Promise<string> {
 
   const ptyId = ptyManager.spawn(PROFESSOR_DIR);
   log.info(
-    { ptyId, agentCount: agents.length, port, mcpEntry: MCP_SERVER_ENTRY },
+    { ptyId, agentCount: agents.length, port, mcpUrl: `http://localhost:${port}/mcp` },
     "professor spawned with MCP wiring"
   );
 

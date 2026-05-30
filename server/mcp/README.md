@@ -8,35 +8,54 @@ n'importe quel client MCP via le standard [Model Context Protocol](https://model
 - **Spike** ✅ — `list_agents` opérationnel
 - **Impl complète** ✅ — 5 tools : list, get_status, spawn, send_message, kill (13 specs vitest sur le bridge)
 - **Wire Professeur** ✅ — `server/professor.ts` écrit un `.mcp.json` dans le dossier du Professeur au moment du spawn, avec le port FleetView courant injecté. Le Professeur peut maintenant lire ET piloter la fleet en live au lieu de se contenter d'un snapshot figé.
+- **HTTP transport** ✅ — endpoint `/mcp` monté dans le serveur HTTP principal, plus de path absolu / tsx / subprocess. Le Professeur utilise cette config par défaut.
 
 ## Architecture
 
+Deux transports possibles. **HTTP est le défaut** (utilisé par Le Professeur,
+zero subprocess, zero path absolu, marche en packaging Electron).
+
+### Transport HTTP (par défaut)
+
 ```
-┌─────────────┐    stdio JSON-RPC    ┌─────────────────┐    HTTP REST    ┌─────────────────┐
-│ MCP client  │ ───────────────────► │  MCP server     │ ──────────────► │ FleetView HTTP  │
-│ (Claude     │                      │  (tsx process)  │                 │ server (Electron│
-│  Code)      │ ◄─────────────────── │  server/mcp/*   │ ◄────────────── │  ou npm run dev)│
-└─────────────┘    JSON-RPC reply    └─────────────────┘    JSON         └─────────────────┘
+┌─────────────┐    POST /mcp (SSE)    ┌─────────────────────────────────┐
+│ MCP client  │ ────────────────────► │ FleetView HTTP server           │
+│ (Claude     │                       │   /mcp endpoint                 │
+│  Code)      │ ◄──────────────────── │   ↳ createMcpServer() inline    │
+└─────────────┘    JSON-RPC reply     └─────────────────────────────────┘
 ```
 
-Le MCP server est un **bridge léger** : il ne maintient aucun state, il
-forward chaque appel vers le serveur HTTP principal qui, lui, possède le
-watcher JSONL + le PTY manager.
+`StreamableHTTPServerTransport` du SDK MCP, monté dans `server/index.ts`
+en mode stateless (une instance fraîche par requête). Les tools tapent
+directement sur les helpers internes (pas de bridge fetch — on est dans
+le même process que le watcher et le PTY manager).
 
-Avantages :
-- Aucun refactor du serveur HTTP
-- Le MCP server est minuscule (~50 lignes utiles)
-- Si l'app FleetView n'est pas lancée, erreur claire (`FleetViewUnreachableError`)
+Config client typique :
+```json
+{ "mcpServers": { "claude-workspace-map": { "type": "http", "url": "http://localhost:4000/mcp" } } }
+```
 
-## Lancer en standalone
+### Transport stdio (alternatif)
+
+Pour les clients qui ne supportent pas HTTP (versions anciennes, certains
+clients embedded), le binaire `server/mcp/main.ts` lance un MCP server stdio
+qui forward via fetch vers le `/api/state` du serveur principal.
 
 ```bash
 npm run mcp
 ```
 
-Lit JSON-RPC sur stdin, écrit sur stdout (silence sur stderr sauf erreur).
+Config client stdio :
+```json
+{ "mcpServers": { "claude-workspace-map": { "command": "npx", "args": ["tsx", "<abs path>/server/mcp/main.ts"] } } }
+```
+
+Inconvénient : path absolu + dépendance à tsx → c'est pour ça que HTTP est
+préféré.
 
 ## Brancher dans Claude Code
+
+### Via HTTP (recommandé)
 
 Ajoute ceci dans `~/.claude.json` (ou via `claude mcp add` si disponible) :
 
@@ -44,18 +63,25 @@ Ajoute ceci dans `~/.claude.json` (ou via `claude mcp add` si disponible) :
 {
   "mcpServers": {
     "claude-workspace-map": {
-      "command": "npx",
-      "args": ["tsx", "/Applications/MAMP/htdocs/map/server/mcp/main.ts"],
-      "env": {
-        "FLEETVIEW_PORT": "4000"
-      }
+      "type": "http",
+      "url": "http://localhost:4000/mcp"
     }
   }
 }
 ```
 
-Au prochain démarrage de Claude Code, les tools du MCP server sont disponibles
-sous le préfixe `mcp__claude-workspace-map__list_agents` (et autres à venir).
+L'app FleetView doit tourner (Electron ou `npm run dev`) — sinon le client
+ne pourra pas se connecter au /mcp endpoint.
+
+### Via stdio (fallback)
+
+Seulement si ton client MCP ne supporte pas HTTP. Cf section "Transport stdio"
+ci-dessus.
+
+---
+
+Au prochain démarrage du client, les tools sont disponibles sous le préfixe
+`mcp__claude-workspace-map__list_agents` (et autres).
 
 ## Tools disponibles
 
@@ -87,12 +113,16 @@ utilise ce MCP server automatiquement.
 ⚠️ **Première utilisation** : Claude Code te demandera la permission d'activer
 le MCP server (one-time, anti-supply-chain). Accepte.
 
-## Packaging Electron — limites connues
+## Packaging Electron
 
-Le MCP server tourne via `npx tsx server/mcp/main.ts`. Dans une app Electron
-packagée, tsx n'est pas disponible et le fichier .ts est dans l'ASAR (non
-exécutable depuis l'extérieur). À résoudre quand on packagera : pré-compiler
-`server/mcp/main.ts` en JS et l'extraire hors ASAR via `extraResources`.
+Avec le transport HTTP (défaut), **plus de problème de packaging** — le MCP
+server est dans le même process que le serveur HTTP, qui est lui-même
+inline dans le main process Electron (`electron/main.ts` → `startServer()`).
+Rien à extraire hors ASAR.
+
+Le transport stdio (`server/mcp/main.ts`) reste limité au mode dev (tsx +
+path absolu). Si on doit le packager un jour pour un client qui ne supporte
+pas HTTP, il faudra pré-compiler en JS et l'extraire via `extraResources`.
 
 ## Test rapide en CLI
 
