@@ -6,6 +6,7 @@ import { child } from "./logger.js";
 import { setValidationErrorSink } from "./parser.js";
 import { ptyManager } from "./pty-manager.js";
 import { spawnProfessor, PROFESSOR_DIR } from "./professor.js";
+import { readConfig, writeConfig } from "./config-store.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 /** MIME types for static file serving (renderer assets in prod). */
@@ -287,6 +288,28 @@ export async function startServer(
       return;
     }
 
+    // ── App config ───────────────────────────────────────────────────────
+    if (req.method === "GET" && url === "/api/config") {
+      const config = await readConfig();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(config));
+      return;
+    }
+
+    if (req.method === "PUT" && url === "/api/config") {
+      let body = "";
+      try {
+        for await (const chunk of req) body += chunk;
+        const updated = await writeConfig(JSON.parse(body));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(updated));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+      return;
+    }
+
     // ── Static file serving (Electron production only) ──────────────────
     // In dev, Vite handles this. In Electron prod, we serve dist/ over HTTP
     // so Phaser's XHR loader and the React API calls both hit localhost:PORT
@@ -329,6 +352,9 @@ export async function startServer(
       resolve();
     });
   });
+
+  // Persist the actual port so the settings UI can display it.
+  readConfig().then((cfg) => writeConfig({ ...cfg, port })).catch(() => {});
 
   await watcher.start();
 

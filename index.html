@@ -6,34 +6,45 @@
     <title>Claude Workspace Map</title>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <style>
-      html, body { margin: 0; padding: 0; background: #1a1a1a; color: #eee; font-family: system-ui, -apple-system, sans-serif; height: 100%; overflow: hidden; }
-      :root { --sidebar-w: 340px; }
+      html, body { margin: 0; padding: 0; background: var(--bg-primary, #0d1117); color: var(--text-primary, #eee); font-family: system-ui, -apple-system, sans-serif; height: 100%; overflow: hidden; }
+      :root {
+        --sidebar-w: 340px;
+        --bg-primary: #0d1117;
+        --bg-secondary: #111418;
+        --bg-hover: #171d27;
+        --bg-surface: #1a1f27;
+        --border: #2c313a;
+        --border-accent: #1a2744;
+        --text-primary: #eeeeee;
+        --text-muted: #9ca3af;
+        --bg-header-start: #131c30;
+      }
       #app-shell { display: flex; min-height: 100vh; height: 100vh; padding-right: var(--sidebar-w); transition: padding-right 0.18s ease; box-sizing: border-box; }
       #app-shell.sidebar-collapsed { --sidebar-w: 40px; }
       #game-mount { flex: 1 1 auto; min-width: 0; height: 100vh; overflow: hidden; image-rendering: pixelated; image-rendering: crisp-edges; }
       #game-mount canvas { display: block; }
-      #agent-sidebar { position: fixed; top: 0; right: 0; width: var(--sidebar-w); height: 100vh; background: #111418; border-left: 1px solid #2c313a; display: flex; flex-direction: column; transition: width 0.18s ease; z-index: 10; }
+      #agent-sidebar { position: fixed; top: 0; right: 0; width: var(--sidebar-w); height: 100vh; background: var(--bg-secondary, #111418); border-left: 1px solid var(--border, #2c313a); display: flex; flex-direction: column; transition: width 0.18s ease; z-index: 10; }
       #agent-sidebar.collapsed { width: 40px; align-items: center; padding: 10px 0; gap: 12px; }
       #agent-sidebar.collapsed .count-vert { font-size: 11px; opacity: 0.6; writing-mode: vertical-rl; transform: rotate(180deg); }
-      #agent-sidebar header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid #2c313a; }
+      #agent-sidebar header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border, #2c313a); }
       #agent-sidebar header h2 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.85; flex: 1; }
       #agent-sidebar header .count { font-size: 11px; opacity: 0.6; }
       #agent-sidebar .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 6px currentColor; flex: 0 0 8px; }
       #agent-sidebar .dot.ok { background: #22c55e; }
       #agent-sidebar .dot.ko { background: #ef4444; }
-      #agent-sidebar .collapse-btn { background: transparent; border: 1px solid #2c313a; color: #eee; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; }
+      #agent-sidebar .collapse-btn { background: transparent; border: 1px solid var(--border, #2c313a); color: var(--text-primary, #eee); width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; }
       #agent-sidebar .collapse-btn:hover { background: #1e2430; }
       #agent-sidebar .groups { overflow-y: auto; flex: 1; padding: 4px 0 12px; }
       #agent-sidebar .empty { padding: 16px 14px; opacity: 0.55; font-size: 12px; }
-      #agent-sidebar section.project { padding: 8px 0; border-bottom: 1px solid #1d2128; }
+      #agent-sidebar section.project { padding: 8px 0; border-bottom: 1px solid var(--bg-hover, #1d2128); }
       #agent-sidebar section.project h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin: 4px 14px 6px; font-weight: 700; }
       #agent-sidebar ul { list-style: none; margin: 0; padding: 0; }
       #agent-sidebar li.agent { padding: 2px 0 6px; }
       #agent-sidebar .agent-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 4px; cursor: pointer; outline: none; }
-      #agent-sidebar .agent-head:hover { background: #1c2128; }
+      #agent-sidebar .agent-head:hover { background: var(--bg-hover, #1c2128); }
       #agent-sidebar .agent-head:focus-visible { box-shadow: inset 0 0 0 1px #6366f1; }
       #agent-sidebar li.sub-agent { cursor: pointer; border-radius: 4px; outline: none; }
-      #agent-sidebar li.sub-agent:hover { background: #1c2128; }
+      #agent-sidebar li.sub-agent:hover { background: var(--bg-hover, #1c2128); }
       #agent-sidebar li.sub-agent:focus-visible { box-shadow: inset 0 0 0 1px #6366f1; }
       #agent-sidebar.errored .boundary-fallback { padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; }
       #agent-sidebar.errored .boundary-fallback p { margin: 0; font-size: 13px; font-weight: 600; color: #f87171; }
@@ -59,30 +70,30 @@
       .empty-spawn-btn:hover { background: #264a68; }
       /* ── SpawnPanel modal ─────────────────────────────────────────────── */
       #spawn-panel-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 40; display: flex; align-items: center; justify-content: center; }
-      #spawn-panel { background: #111418; border: 1px solid #2c313a; border-radius: 8px; width: 420px; max-width: 92vw; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
+      #spawn-panel { background: var(--bg-secondary, #111418); border: 1px solid var(--border, #2c313a); border-radius: 8px; width: 420px; max-width: 92vw; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
       #spawn-panel header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; }
       #spawn-panel header h3 { margin: 0; font-size: 14px; font-weight: 700; }
       #spawn-panel label { font-size: 12px; opacity: 0.65; letter-spacing: 0.03em; text-transform: uppercase; }
-      #spawn-panel input[type="text"] { background: #0d1117; border: 1px solid #2c313a; color: #eee; padding: 8px 10px; border-radius: 5px; font-size: 13px; font-family: ui-monospace, monospace; width: 100%; box-sizing: border-box; outline: none; }
+      #spawn-panel input[type="text"] { background: var(--bg-primary, #0d1117); border: 1px solid var(--border, #2c313a); color: var(--text-primary, #eee); padding: 8px 10px; border-radius: 5px; font-size: 13px; font-family: ui-monospace, monospace; width: 100%; box-sizing: border-box; outline: none; }
       #spawn-panel input[type="text"]:focus { border-color: #6366f1; }
       #spawn-panel .recent-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
       #spawn-panel .recent-label { font-size: 11px; opacity: 0.55; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 4px; }
-      #spawn-panel .recent-item { background: #1a1f27; border: 1px solid #2c313a; color: #ccc; padding: 3px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #spawn-panel .recent-item { background: var(--bg-surface, #1a1f27); border: 1px solid var(--border, #2c313a); color: #ccc; padding: 3px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #spawn-panel .recent-item:hover { border-color: #6366f1; color: #eee; }
       #spawn-panel .recent-item.active { border-color: #6366f1; background: #1e203a; color: #a5b4fc; }
       #spawn-panel .spawn-error { color: #f87171; font-size: 12px; margin: 0; }
       #spawn-panel .spawn-actions { display: flex; gap: 8px; justify-content: flex-end; }
-      #spawn-panel .cancel-btn { background: transparent; border: 1px solid #2c313a; color: #aaa; padding: 6px 14px; border-radius: 5px; cursor: pointer; font-size: 13px; }
-      #spawn-panel .cancel-btn:hover { border-color: #555; color: #eee; }
-      #spawn-panel .spawn-btn { background: #4338ca; border: 1px solid #6366f1; color: #eee; padding: 6px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600; }
-      #spawn-panel .spawn-btn:hover:not(:disabled) { background: #4f46e5; }
-      #spawn-panel .spawn-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-      #spawn-panel .close-btn { background: transparent; border: none; color: #888; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 3px; line-height: 1; }
-      #spawn-panel .close-btn:hover { color: #eee; }
+      #spawn-panel .cancel-btn, #settings-panel .cancel-btn { background: transparent; border: 1px solid var(--border, #2c313a); color: #aaa; padding: 6px 14px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+      #spawn-panel .cancel-btn:hover, #settings-panel .cancel-btn:hover { border-color: #555; color: var(--text-primary, #eee); }
+      #spawn-panel .spawn-btn, #settings-panel .spawn-btn { background: #4338ca; border: 1px solid #6366f1; color: #eee; padding: 6px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600; }
+      #spawn-panel .spawn-btn:hover:not(:disabled), #settings-panel .spawn-btn:hover:not(:disabled) { background: #4f46e5; }
+      #spawn-panel .spawn-btn:disabled, #settings-panel .spawn-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+      #spawn-panel .close-btn, #settings-panel .close-btn { background: transparent; border: none; color: #888; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 3px; line-height: 1; }
+      #spawn-panel .close-btn:hover, #settings-panel .close-btn:hover { color: var(--text-primary, #eee); }
       /* ── TerminalOverlay — centered floating window in the map area ─── */
       #terminal-overlay { position: fixed; top: 0; left: 0; right: var(--sidebar-w); bottom: 0; z-index: 30; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-      #terminal-panel { pointer-events: all; display: flex; flex-direction: column; width: min(84vw, 960px); height: 68vh; background: #0d1117; border: 1px solid #3b3f4a; border-radius: 10px; box-shadow: 0 24px 80px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04); overflow: hidden; }
-      #terminal-header { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: #111418; border-bottom: 1px solid #1d2128; flex: 0 0 auto; }
+      #terminal-panel { pointer-events: all; display: flex; flex-direction: column; width: min(84vw, 960px); height: 68vh; background: var(--bg-primary, #0d1117); border: 1px solid #3b3f4a; border-radius: 10px; box-shadow: 0 24px 80px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04); overflow: hidden; }
+      #terminal-header { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: var(--bg-secondary, #111418); border-bottom: 1px solid var(--bg-hover, #1d2128); flex: 0 0 auto; }
       #terminal-header .term-title { font-size: 13px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #terminal-header .term-pty-id { font-size: 10px; font-family: ui-monospace, monospace; opacity: 0.35; }
       #terminal-header .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
@@ -117,7 +128,7 @@
       .crash-respawn-btn { background: #1e2d3d; border: 1px solid #3b5a80; color: #7dd3fc; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
       .crash-respawn-btn:hover { background: #264a68; border-color: #60a5fa; }
       /* ── Notifications ────────────────────────────────────────────────────── */
-      .notif-btn { background: transparent; border: 1px solid #2c313a; color: #eee; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; opacity: 0.6; transition: opacity 0.12s, background 0.12s, border-color 0.12s; }
+      .notif-btn { background: transparent; border: 1px solid var(--border, #2c313a); color: var(--text-primary, #eee); width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; opacity: 0.6; transition: opacity 0.12s, background 0.12s, border-color 0.12s; }
       .notif-btn:hover { opacity: 1; background: #1e2430; }
       .notif-btn.active { background: #2d2210; border-color: #a16207; color: #fbbf24; opacity: 1; }
       .notif-btn.active:hover { background: #3d2e10; border-color: #d97706; }
@@ -153,14 +164,32 @@
       html, body { background: #0d1117; }
       #game-mount { position: relative; }
       #game-mount::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 48%, transparent 52%, rgba(0,0,0,0.55) 100%); pointer-events: none; z-index: 5; }
-      #agent-sidebar { border-left: 1px solid #1a2744; box-shadow: -8px 0 28px rgba(0,0,0,0.55); }
-      #agent-sidebar header { background: linear-gradient(160deg, #131c30 0%, #111418 100%); border-bottom: 1px solid #1a2744; }
+      #agent-sidebar { border-left: 1px solid var(--border-accent, #1a2744); box-shadow: -8px 0 28px rgba(0,0,0,0.55); }
+      #agent-sidebar header { background: linear-gradient(160deg, var(--bg-header-start, #131c30) 0%, var(--bg-secondary, #111418) 100%); border-bottom: 1px solid var(--border-accent, #1a2744); }
       #agent-sidebar .groups::-webkit-scrollbar { width: 3px; }
       #agent-sidebar .groups::-webkit-scrollbar-track { background: transparent; }
       #agent-sidebar .groups::-webkit-scrollbar-thumb { background: #2a3345; border-radius: 2px; }
       #agent-sidebar .groups::-webkit-scrollbar-thumb:hover { background: #3d4f6a; }
       #agent-sidebar .status-dot { transition: background-color 0.35s ease, box-shadow 0.35s ease; }
-      #agent-sidebar .agent-head:hover { background: #171d27; box-shadow: inset 2px 0 0 #6366f1; }
+      #agent-sidebar .agent-head:hover { background: var(--bg-hover, #171d27); box-shadow: inset 2px 0 0 #6366f1; }
+      /* ── SettingsPanel modal ──────────────────────────────────────────── */
+      #settings-panel-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 40; display: flex; align-items: center; justify-content: center; }
+      #settings-panel { background: var(--bg-secondary, #111418); border: 1px solid var(--border, #2c313a); border-radius: 8px; width: 380px; max-width: 92vw; padding: 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
+      #settings-panel header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; }
+      #settings-panel header h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary, #eee); }
+      #settings-panel .settings-label { font-size: 12px; opacity: 0.65; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-primary, #eee); }
+      .settings-toggle { display: flex; gap: 6px; }
+      .settings-toggle button { background: var(--bg-surface, #1a1f27); border: 1px solid var(--border, #2c313a); color: var(--text-primary, #eee); padding: 5px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; transition: border-color 0.12s, background 0.12s; }
+      .settings-toggle button.active { border-color: #6366f1; background: #1e203a; color: #a5b4fc; }
+      .settings-toggle button:not(.active):hover { border-color: #555; }
+      .settings-slider-row { display: flex; align-items: center; gap: 10px; }
+      .settings-slider-row input[type="range"] { flex: 1; accent-color: #6366f1; }
+      .settings-slider-val { font-size: 12px; font-family: ui-monospace, monospace; opacity: 0.7; min-width: 40px; text-align: right; color: var(--text-primary, #eee); }
+      .settings-port { font-family: ui-monospace, monospace; font-size: 13px; color: var(--text-primary, #eee); opacity: 0.8; }
+      .settings-note { font-size: 11px; opacity: 0.5; font-style: italic; margin-left: 6px; }
+      .settings-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+      #agent-sidebar .settings-btn-header { background: transparent; border: 1px solid var(--border, #2c313a); color: var(--text-primary, #eee); width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; opacity: 0.6; transition: opacity 0.12s, background 0.12s; }
+      #agent-sidebar .settings-btn-header:hover { opacity: 1; background: var(--bg-hover, #1e2430); }
     </style>
   </head>
   <body>
