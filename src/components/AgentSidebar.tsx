@@ -2,24 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   AgentState,
   ServerEvent,
-  SubAgentState,
-  PendingQuestion,
 } from "../../shared/agent-types";
-import {
-  teacherSpriteFor,
-  studentSpriteFor,
-} from "../../shared/agent-sprites";
-import { STATUS_COLOR, STATUS_LABEL, statusOrder } from "../../shared/agent-ui";
+import { statusOrder } from "../../shared/agent-ui";
 import { uiBus } from "../game/services/uiBus";
 import { SpawnPanel } from "./SpawnPanel";
 import { TerminalOverlay } from "./TerminalOverlay";
+import { CommandPalette, type CommandItem } from "./CommandPalette";
+import { AgentRow, type ActivePty } from "./AgentRow";
 
-// ── PTY session state ───────────────────────────────────────────────────────
-export interface ActivePty {
-  ptyId: string;
-  cwd: string;
-  minimized: boolean;
-}
+export type { ActivePty };
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 function loadRecentCwds(): string[] {
@@ -31,18 +22,6 @@ function loadRecentCwds(): string[] {
 }
 function saveRecentCwds(cwds: string[]) {
   try { localStorage.setItem("recentCwds", JSON.stringify(cwds)); } catch { /* ignore */ }
-}
-
-// ── Sprite helper ───────────────────────────────────────────────────────────
-function spriteStyle(spriteName: string): React.CSSProperties {
-  return {
-    backgroundImage: `url(/assets/sprites/${spriteName}.png)`,
-    backgroundPosition: "-32px 0px",
-    backgroundSize: "96px 128px",
-    width: 32,
-    height: 32,
-    imageRendering: "pixelated",
-  };
 }
 
 // ── Props ───────────────────────────────────────────────────────────────────
@@ -59,6 +38,7 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
   const [ptySessions, setPtySessions] = useState<ActivePty[]>([]);
   const [showSpawnPanel, setShowSpawnPanel] = useState(false);
   const [spawnDefaultCwd, setSpawnDefaultCwd] = useState("");
+  const [showCmdPalette, setShowCmdPalette] = useState(false);
   const [recentCwds, setRecentCwds] = useState<string[]>(loadRecentCwds);
   /** sessionId being resumed right now (shows spinner in that row). */
   const [resumingId, setResumingId] = useState<string | null>(null);
@@ -320,6 +300,88 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
   const totalSubs = agents.reduce((acc, a) => acc + a.subAgents.filter((s) => !s.finished).length, 0);
   const inactiveCount = agents.filter((a) => a.status === "done" || a.status === "idle").length;
 
+  // ── Command palette items ─────────────────────────────────────────────────
+  const paletteItems = useMemo<CommandItem[]>(() => {
+    const out: CommandItem[] = [];
+    // Agents — full sidebar-style rows (sprite, status, sub-agents nested,
+    // pending-approval widget, dismiss × on hover), grouped by project (cwd).
+    // Same component as the sidebar, so the visual is identical in both
+    // surfaces. Default action = open terminal.
+    for (const g of groups) {
+      const projectName = shortName(g.cwd);
+      const groupLabel = `Project — ${projectName}`;
+      for (const a of g.agents) {
+        const pty = ptySessions.find((p) => p.cwd === a.cwd);
+        out.push({
+          kind: "agent",
+          id: `agent:${a.sessionId}`,
+          group: groupLabel,
+          agent: a,
+          pty,
+          resuming: resumingId === a.sessionId,
+          onSelect: () => handleAgentClick(a),
+          onDismiss: () => dismissAgent(a.sessionId),
+        });
+      }
+    }
+    // Actions — global commands. Shortcuts visible in `hint` mirror the keys
+    // bound on `window` so the palette is also a keyboard cheat-sheet.
+    out.push({
+      id: "action:new-session",
+      label: "New Claude session…",
+      hint: "N",
+      group: "Actions",
+      icon: "⚡",
+      onSelect: () => { setSpawnDefaultCwd(""); setShowSpawnPanel(true); },
+    });
+    out.push({
+      id: "action:professor",
+      label: "Spawn Professor",
+      hint: "P",
+      group: "Actions",
+      icon: "🎓",
+      onSelect: () => void spawnProfessor(),
+    });
+    out.push({
+      id: "action:toggle-sidebar",
+      label: collapsed ? "Show sidebar list" : "Hide sidebar list",
+      hint: "S",
+      group: "Actions",
+      icon: "▤",
+      onSelect: () => onToggle(),
+    });
+    out.push({
+      id: "action:settings",
+      label: "Open Settings",
+      hint: ",",
+      group: "Actions",
+      icon: "⚙",
+      onSelect: () => onOpenSettings(),
+    });
+    if (typeof Notification !== "undefined" && notifPermission !== "granted") {
+      out.push({
+        id: "action:enable-notif",
+        label: "Enable desktop notifications",
+        hint: "B",
+        group: "Actions",
+        icon: "🔔",
+        onSelect: () => void requestNotifPermission(),
+      });
+    }
+    if (inactiveCount > 0) {
+      out.push({
+        id: "action:clear-inactive",
+        label: `Clear ${inactiveCount} inactive agent${inactiveCount > 1 ? "s" : ""}`,
+        hint: "⌫",
+        group: "Actions",
+        icon: "🧹",
+        onSelect: () => dismissAllInactive(),
+      });
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, inactiveCount, collapsed, notifPermission]);
+
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   /** Index into the flat agent list for Tab cycling. */
   const cycleIdxRef = useRef(0);
@@ -330,6 +392,15 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
   /** Always-current snapshot of reactive values used inside the stable handler. */
   const kbRef = useRef({ groups, ptySessions, inactiveCount });
   kbRef.current = { groups, ptySessions, inactiveCount };
+  /** Stable read of palette open state inside the global keydown handler. */
+  const showCmdPaletteRef = useRef(showCmdPalette);
+  showCmdPaletteRef.current = showCmdPalette;
+  /** Props captured into refs so the (stable) keydown handler always invokes
+   *  the latest callback, even after parent re-renders. */
+  const onToggleRef = useRef(onToggle);
+  onToggleRef.current = onToggle;
+  const onOpenSettingsRef = useRef(onOpenSettings);
+  onOpenSettingsRef.current = onOpenSettings;
 
   // Track modal open/close events from Phaser (RPGAgentMenuUI, RPGApprovalUI).
   useEffect(() => {
@@ -342,9 +413,22 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Cmd+K / Ctrl+K → toggle command palette. Fires even when typing in a
+      // form field (it's the universal "open palette" shortcut), but not when
+      // a Phaser modal is up.
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        if (modalDepthRef.current > 0) return;
+        e.preventDefault();
+        setShowCmdPalette((s) => !s);
+        return;
+      }
+
       // Phaser-side modal is up — let the player drive the menu without
       // triggering the sidebar's house-jump / spawn / cycle shortcuts.
       if (modalDepthRef.current > 0) return;
+
+      // Palette owns its own keyboard while open.
+      if (showCmdPaletteRef.current) return;
 
       // Never fire while the user is typing in a form field or the spawn panel.
       const t = e.target as HTMLElement;
@@ -398,6 +482,19 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
           }
           break;
 
+        // S → toggle the sidebar list (palette-first UX exposes this as a
+        // discoverable shortcut, visible in the palette hint as "S").
+        case "s": case "S":
+          e.preventDefault();
+          onToggleRef.current();
+          break;
+
+        // , → open Settings (VS Code convention).
+        case ",":
+          e.preventDefault();
+          onOpenSettingsRef.current();
+          break;
+
         // Tab → cycle through agents (player walks to each one in turn)
         case "Tab": {
           e.preventDefault();
@@ -427,14 +524,26 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
   }, []); // stable: kbRef + stable setters
 
   // ── Collapsed sidebar ─────────────────────────────────────────────────────
+  // No visible chrome — palette is the entry point. Floating overlays (spawn
+  // panel, palette, terminals) still need to render because the palette can
+  // open them even when the sidebar shell is hidden.
   if (collapsed) {
     return (
       <>
-        <aside id="agent-sidebar" className="collapsed">
-          <button className="collapse-btn" onClick={onToggle} title="Show agents">←</button>
-          <span className={`dot ${connected ? "ok" : "ko"}`} />
-          <span className="count-vert">{totalAgents}</span>
-        </aside>
+        {showSpawnPanel && (
+          <SpawnPanel
+            recentCwds={recentCwds}
+            defaultCwd={spawnDefaultCwd || undefined}
+            onClose={() => setShowSpawnPanel(false)}
+            onSpawned={(session) => { setShowSpawnPanel(false); handleSpawned(session); }}
+          />
+        )}
+        {showCmdPalette && (
+          <CommandPalette
+            items={paletteItems}
+            onClose={() => setShowCmdPalette(false)}
+          />
+        )}
         {renderTerminals()}
       </>
     );
@@ -540,6 +649,13 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
         />
       )}
 
+      {showCmdPalette && (
+        <CommandPalette
+          items={paletteItems}
+          onClose={() => setShowCmdPalette(false)}
+        />
+      )}
+
       {renderTerminals()}
     </>
   );
@@ -561,227 +677,6 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
   }
 }
 
-// ── AgentRow ────────────────────────────────────────────────────────────────
-function AgentRow({
-  agent,
-  pty,
-  resuming,
-  onClick,
-  onDismiss,
-}: {
-  agent: AgentState;
-  pty?: ActivePty;
-  resuming: boolean;
-  onClick: () => void;
-  onDismiss: () => void;
-}) {
-  const liveSubs = agent.subAgents.filter((s) => !s.finished);
-
-  let termTitle: string;
-  if (resuming)            termTitle = "Opening Claude Code…";
-  else if (pty?.minimized) termTitle = "Restore terminal";
-  else if (pty)            termTitle = "Terminal open — click to bring up";
-  else                     termTitle = `Open in Claude Code (${agent.sessionId.slice(0, 8)}…)`;
-
-  const hasPending = agent.pendingPlan !== undefined ||
-    (agent.pendingQuestions && agent.pendingQuestions.length > 0);
-
-  return (
-    <li className="agent">
-      <div
-        className={`agent-head ${resuming ? "resuming" : ""}`}
-        role="button"
-        tabIndex={0}
-        onClick={resuming ? undefined : onClick}
-        onKeyDown={(e) => { if (!resuming && (e.key === "Enter" || e.key === " ")) onClick(); }}
-        title={termTitle}
-        aria-busy={resuming}
-      >
-        <span className="icon teacher" style={spriteStyle(teacherSpriteFor(agent.sessionId))} />
-        <div className="meta">
-          <div className="line">
-            <span
-              className={`status-dot${agent.status === "awaiting_approval" || agent.status === "blocked" ? " status-dot-pulse" : ""}`}
-              style={{ background: STATUS_COLOR[agent.status] }}
-            />
-            <span className="status">{STATUS_LABEL[agent.status]}</span>
-            {agent.currentTool ? <span className="tool"> · {agent.currentTool}</span> : null}
-          </div>
-          {agent.currentToolDetail ? (
-            <div className="detail" title={agent.currentToolDetail}>{agent.currentToolDetail}</div>
-          ) : null}
-        </div>
-        {/* Terminal badge */}
-        {resuming ? (
-          <span className="terminal-badge resuming-badge" title="Launching…">···</span>
-        ) : pty ? (
-          <span
-            className={`terminal-badge ${pty.minimized ? "minimized" : "active"}`}
-            title={pty.minimized ? "Terminal minimized — click to restore" : "Terminal open"}
-          >
-            &gt;_
-          </span>
-        ) : (
-          <span className="terminal-badge resume-hint" title={termTitle}>▶</span>
-        )}
-        {/* Dismiss button — visible on hover */}
-        <button
-          className="dismiss-btn"
-          title="Dismiss agent"
-          onClick={(e) => { e.stopPropagation(); onDismiss(); }}
-        >
-          ×
-        </button>
-      </div>
-
-      {/* Inline approval widget — shown when ExitPlanMode or AskUserQuestion is pending */}
-      {hasPending && (
-        <PendingApprovalWidget agent={agent} pty={pty} onOpenTerminal={onClick} />
-      )}
-
-      {liveSubs.length > 0 && (
-        <ul className="subs">
-          {liveSubs.map((s) => <SubAgentRow key={s.id} sub={s} />)}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-// ── PendingApprovalWidget ────────────────────────────────────────────────────
-/**
- * Inline card rendered below an agent row when Claude is waiting for the
- * user's input (ExitPlanMode → plan, AskUserQuestion → questions).
- * Clicking "Open Terminal" opens the agent's Claude Code session so the user
- * can type their response directly in the terminal.
- */
-function PendingApprovalWidget({
-  agent,
-  pty,
-  onOpenTerminal,
-}: {
-  agent: AgentState;
-  pty?: ActivePty;
-  onOpenTerminal: () => void;
-}) {
-  // If no PTY is open for this agent, it was started outside FleetView.
-  // We can't write to its stdin — just tell the user where to look.
-  const canInteract = !!pty;
-
-  if (agent.pendingPlan) {
-    return <PlanWidget plan={agent.pendingPlan} canInteract={canInteract} onOpen={onOpenTerminal} />;
-  }
-  if (agent.pendingQuestions && agent.pendingQuestions.length > 0) {
-    return <QuestionsWidget questions={agent.pendingQuestions} canInteract={canInteract} onOpen={onOpenTerminal} />;
-  }
-  return null;
-}
-
-function PlanWidget({ plan, canInteract, onOpen }: { plan: string; canInteract: boolean; onOpen: () => void }) {
-  const lines = plan.split("\n").filter((l) => l.trim());
-  const title = (lines[0] ?? "Plan").replace(/^#+\s*/, "");
-  // Grab up to 3 body lines as a preview, skip further headings.
-  const bodyLines = lines.slice(1).filter((l) => !l.startsWith("#")).slice(0, 3);
-  const preview = bodyLines.join(" ").slice(0, 140);
-
-  return (
-    <div className="approval-widget">
-      <div className="approval-header">
-        <span className="approval-icon">📋</span>
-        <span className="approval-title">{title}</span>
-      </div>
-      {preview && <p className="approval-preview">{preview}{preview.length >= 140 ? "…" : ""}</p>}
-      <div className="approval-actions">
-        {canInteract ? (
-          <button className="approval-btn" onClick={onOpen}>
-            Répondre dans le terminal
-          </button>
-        ) : (
-          <span className="approval-external-hint">
-            ↗ Réponds dans ton terminal Claude Code
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function QuestionsWidget({
-  questions,
-  canInteract,
-  onOpen,
-}: {
-  questions: PendingQuestion[];
-  canInteract: boolean;
-  onOpen: () => void;
-}) {
-  const q = questions[0];
-  return (
-    <div className="approval-widget">
-      <div className="approval-header">
-        <span className="approval-icon">❓</span>
-        <span className="approval-title">{q.question}</span>
-      </div>
-      <ul className="approval-options">
-        {q.options.map((opt, i) => (
-          <li key={i} className="approval-option">
-            <span className="option-num">{i + 1}.</span>
-            <span className="option-label">{opt.label}</span>
-            {opt.description && (
-              <span className="option-desc">{opt.description}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-      {questions.length > 1 && (
-        <p className="approval-more">+{questions.length - 1} more question{questions.length > 2 ? "s" : ""}</p>
-      )}
-      <div className="approval-actions">
-        {canInteract ? (
-          <button className="approval-btn" onClick={onOpen}>
-            Répondre dans le terminal
-          </button>
-        ) : (
-          <span className="approval-external-hint">
-            ↗ Réponds dans ton terminal Claude Code
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── SubAgentRow ─────────────────────────────────────────────────────────────
-function SubAgentRow({ sub }: { sub: SubAgentState }) {
-  return (
-    <li className="sub-agent" tabIndex={0}>
-      <span
-        className="icon student"
-        style={{
-          backgroundImage: `url(/assets/sprites/${studentSpriteFor(sub.id)}.png)`,
-          backgroundPosition: "-24px 0px",
-          backgroundSize: "72px 96px",
-          width: 24,
-          height: 24,
-          imageRendering: "pixelated",
-          flex: "0 0 24px",
-          backgroundRepeat: "no-repeat",
-        }}
-      />
-      <div className="meta">
-        <div className="name" title={sub.description}>{sub.description || "Sub-task"}</div>
-        <div className="line">
-          <span className="status-dot" style={{ background: STATUS_COLOR[sub.status] }} />
-          <span className="status">{STATUS_LABEL[sub.status]}</span>
-          {sub.currentTool ? <span className="tool"> · {sub.currentTool}</span> : null}
-        </div>
-        {sub.currentToolDetail ? (
-          <div className="detail" title={sub.currentToolDetail}>{sub.currentToolDetail}</div>
-        ) : null}
-      </div>
-    </li>
-  );
-}
 
 function shortName(cwd: string): string {
   if (!cwd) return "unknown";

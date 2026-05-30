@@ -19,8 +19,11 @@
         --text-muted: #9ca3af;
         --bg-header-start: #131c30;
       }
-      #app-shell { display: flex; min-height: 100vh; height: 100vh; padding-right: var(--sidebar-w); transition: padding-right 0.18s ease; box-sizing: border-box; }
-      #app-shell.sidebar-collapsed { --sidebar-w: 40px; }
+      #app-shell { display: flex; min-height: 100vh; height: 100vh; padding-right: var(--sidebar-w); box-sizing: border-box; }
+      /* NB: transitions on properties that consume CSS variables don't animate
+         reliably across browsers — keep the layout reflow instant and animate
+         the sidebar's own width instead (see #agent-sidebar below). */
+      #app-shell.sidebar-collapsed { --sidebar-w: 0px; }
       #game-mount { flex: 1 1 auto; min-width: 0; height: 100vh; overflow: hidden; image-rendering: pixelated; image-rendering: crisp-edges; }
       #game-mount canvas { display: block; }
       #agent-sidebar { position: fixed; top: 0; right: 0; width: var(--sidebar-w); height: 100vh; background: var(--bg-secondary, #111418); border-left: 1px solid var(--border, #2c313a); display: flex; flex-direction: column; transition: width 0.18s ease; z-index: 10; }
@@ -39,29 +42,29 @@
       #agent-sidebar section.project { padding: 8px 0; border-bottom: 1px solid var(--bg-hover, #1d2128); }
       #agent-sidebar section.project h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin: 4px 14px 6px; font-weight: 700; }
       #agent-sidebar ul { list-style: none; margin: 0; padding: 0; }
-      #agent-sidebar li.agent { padding: 2px 0 6px; }
-      #agent-sidebar .agent-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 4px; cursor: pointer; outline: none; }
-      #agent-sidebar .agent-head:hover { background: var(--bg-hover, #1c2128); }
-      #agent-sidebar .agent-head:focus-visible { box-shadow: inset 0 0 0 1px #6366f1; }
-      #agent-sidebar li.sub-agent { cursor: pointer; border-radius: 4px; outline: none; }
-      #agent-sidebar li.sub-agent:hover { background: var(--bg-hover, #1c2128); }
-      #agent-sidebar li.sub-agent:focus-visible { box-shadow: inset 0 0 0 1px #6366f1; }
+      :where(#agent-sidebar, #cmd-palette) li.agent { padding: 2px 0 6px; list-style: none; }
+      :where(#agent-sidebar, #cmd-palette) .agent-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 4px; cursor: pointer; outline: none; }
+      :where(#agent-sidebar, #cmd-palette) .agent-head:hover { background: var(--bg-hover, #1c2128); }
+      :where(#agent-sidebar, #cmd-palette) .agent-head:focus-visible { box-shadow: inset 0 0 0 1px #6366f1; }
+      :where(#agent-sidebar, #cmd-palette) li.sub-agent { cursor: pointer; border-radius: 4px; outline: none; list-style: none; }
+      :where(#agent-sidebar, #cmd-palette) li.sub-agent:hover { background: var(--bg-hover, #1c2128); }
+      :where(#agent-sidebar, #cmd-palette) li.sub-agent:focus-visible { box-shadow: inset 0 0 0 1px #6366f1; }
       #agent-sidebar.errored .boundary-fallback { padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; }
       #agent-sidebar.errored .boundary-fallback p { margin: 0; font-size: 13px; font-weight: 600; color: #f87171; }
       #agent-sidebar.errored .boundary-fallback code { font-size: 11px; opacity: 0.7; word-break: break-word; font-family: ui-monospace, monospace; }
       #agent-sidebar.errored .boundary-fallback button { width: max-content; background: #1f2937; border: 1px solid #374151; color: #eee; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
       #agent-sidebar.errored .boundary-fallback button:hover { background: #2c3645; }
-      #agent-sidebar .icon { flex: 0 0 32px; image-rendering: pixelated; background-repeat: no-repeat; }
-      #agent-sidebar .meta { flex: 1; min-width: 0; }
-      #agent-sidebar .name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      #agent-sidebar .line { font-size: 11px; opacity: 0.85; display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-      #agent-sidebar .status-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 5px currentColor; flex: 0 0 8px; }
-      #agent-sidebar .tool { color: #f4f4f5; opacity: 0.85; }
-      #agent-sidebar .detail { font-size: 10.5px; opacity: 0.55; margin-top: 4px; font-family: ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 42px; }
-      #agent-sidebar ul.subs { margin: 6px 0 0 24px; padding-left: 14px; border-left: 1px dashed #2c313a; }
-      #agent-sidebar li.sub-agent { display: flex; gap: 8px; padding: 4px 6px; }
-      #agent-sidebar li.sub-agent .icon { flex: 0 0 24px; width: 24px; height: 24px; background-size: 72px 96px; background-position: -24px 0px; }
-      #agent-sidebar li.sub-agent .detail { padding-left: 30px; }
+      :where(#agent-sidebar, #cmd-palette) .icon { flex: 0 0 32px; image-rendering: pixelated; background-repeat: no-repeat; }
+      :where(#agent-sidebar, #cmd-palette) .meta { flex: 1; min-width: 0; }
+      :where(#agent-sidebar, #cmd-palette) .name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      :where(#agent-sidebar, #cmd-palette) .line { font-size: 11px; opacity: 0.85; display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+      :where(#agent-sidebar, #cmd-palette) .status-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 5px currentColor; flex: 0 0 8px; }
+      :where(#agent-sidebar, #cmd-palette) .tool { color: #f4f4f5; opacity: 0.85; }
+      :where(#agent-sidebar, #cmd-palette) .detail { font-size: 10.5px; opacity: 0.55; margin-top: 4px; font-family: ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 42px; }
+      :where(#agent-sidebar, #cmd-palette) ul.subs { margin: 6px 0 0 24px; padding-left: 14px; border-left: 1px dashed #2c313a; list-style: none; }
+      :where(#agent-sidebar, #cmd-palette) li.sub-agent { display: flex; gap: 8px; padding: 4px 6px; }
+      :where(#agent-sidebar, #cmd-palette) li.sub-agent .icon { flex: 0 0 24px; width: 24px; height: 24px; background-size: 72px 96px; background-position: -24px 0px; }
+      :where(#agent-sidebar, #cmd-palette) li.sub-agent .detail { padding-left: 30px; }
       /* ── Spawn button in sidebar header ──────────────────────────────── */
       #agent-sidebar .spawn-btn-header { background: #1e2d3d; border: 1px solid #3b5a80; color: #7dd3fc; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; transition: background 0.12s; }
       #agent-sidebar .spawn-btn-header:hover { background: #264a68; border-color: #60a5fa; }
@@ -114,11 +117,11 @@
       .terminal-badge.minimized { background: rgba(55, 65, 81, 0.4); border: 1px solid #374151; color: #6b7280; }
       /* ▶ hint shown on agents without a running terminal */
       .terminal-badge.resume-hint { background: transparent; border: 1px solid #2c313a; color: #4b5563; font-size: 8px; opacity: 0; transition: opacity 0.12s; }
-      #agent-sidebar .agent-head:hover .resume-hint { opacity: 1; }
+      :where(#agent-sidebar, #cmd-palette) .agent-head:hover .resume-hint { opacity: 1; }
       /* ··· spinner shown while launching */
       .terminal-badge.resuming-badge { background: rgba(251,191,36,0.15); border: 1px solid #d97706; color: #fbbf24; letter-spacing: 0.1em; animation: badge-pulse 0.9s ease-in-out infinite; }
       @keyframes badge-pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
-      #agent-sidebar .agent-head.resuming { cursor: wait; opacity: 0.75; }
+      :where(#agent-sidebar, #cmd-palette) .agent-head.resuming { cursor: wait; opacity: 0.75; }
       /* ── Terminal crash / ended bars ─────────────────────────────────────── */
       #terminal-crash-bar, #terminal-ended-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px; flex: 0 0 auto; font-size: 12px; }
       #terminal-crash-bar { background: rgba(239,68,68,0.12); border-top: 1px solid rgba(239,68,68,0.35); }
@@ -154,7 +157,7 @@
       .approval-external-hint { font-size: 11px; color: #6b7280; font-style: italic; }
       /* ── Dismiss / clear buttons ─────────────────────────────────────────── */
       .dismiss-btn { opacity: 0; background: transparent; border: none; color: #6b7280; cursor: pointer; padding: 2px 5px; border-radius: 3px; font-size: 15px; line-height: 1; transition: opacity 0.1s, color 0.1s; flex-shrink: 0; }
-      #agent-sidebar .agent-head:hover .dismiss-btn { opacity: 1; }
+      :where(#agent-sidebar, #cmd-palette) .agent-head:hover .dismiss-btn { opacity: 1; }
       .dismiss-btn:hover { color: #ef4444; }
       #agent-sidebar .clear-btn-header { background: transparent; border: 1px solid #2c313a; color: #eee; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; opacity: 0.6; transition: opacity 0.12s, background 0.12s; }
       #agent-sidebar .clear-btn-header:hover { opacity: 1; background: #1e2430; }
@@ -170,8 +173,8 @@
       #agent-sidebar .groups::-webkit-scrollbar-track { background: transparent; }
       #agent-sidebar .groups::-webkit-scrollbar-thumb { background: #2a3345; border-radius: 2px; }
       #agent-sidebar .groups::-webkit-scrollbar-thumb:hover { background: #3d4f6a; }
-      #agent-sidebar .status-dot { transition: background-color 0.35s ease, box-shadow 0.35s ease; }
-      #agent-sidebar .agent-head:hover { background: var(--bg-hover, #171d27); box-shadow: inset 2px 0 0 #6366f1; }
+      :where(#agent-sidebar, #cmd-palette) .status-dot { transition: background-color 0.35s ease, box-shadow 0.35s ease; }
+      :where(#agent-sidebar, #cmd-palette) .agent-head:hover { background: var(--bg-hover, #171d27); box-shadow: inset 2px 0 0 #6366f1; }
       /* ── SettingsPanel modal ──────────────────────────────────────────── */
       #settings-panel-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 40; display: flex; align-items: center; justify-content: center; }
       #settings-panel { background: var(--bg-secondary, #111418); border: 1px solid var(--border, #2c313a); border-radius: 8px; width: 380px; max-width: 92vw; padding: 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
@@ -190,6 +193,37 @@
       .settings-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
       #agent-sidebar .settings-btn-header { background: transparent; border: 1px solid var(--border, #2c313a); color: var(--text-primary, #eee); width: 22px; height: 22px; border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; opacity: 0.6; transition: opacity 0.12s, background 0.12s; }
       #agent-sidebar .settings-btn-header:hover { opacity: 1; background: var(--bg-hover, #1e2430); }
+      /* ── CommandPalette (Cmd+K) ──────────────────────────────────────────── */
+      #cmd-palette-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding-top: 5vh; padding-bottom: 5vh; }
+      #cmd-palette { background: var(--bg-secondary, #111418); border: 1px solid var(--border, #2c313a); border-radius: 10px; width: 1000px; max-width: 94vw; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.7); overflow: hidden; }
+      #cmd-palette .cmd-palette-input { background: transparent; border: none; outline: none; color: var(--text-primary, #eee); padding: 14px 18px; font-size: 15px; border-bottom: 1px solid var(--border, #2c313a); }
+      #cmd-palette .cmd-palette-input::placeholder { color: var(--text-muted, #6b7280); }
+      #cmd-palette .cmd-palette-list { overflow-y: auto; flex: 1; padding: 6px 0; }
+      #cmd-palette .cmd-palette-list::-webkit-scrollbar { width: 6px; }
+      #cmd-palette .cmd-palette-list::-webkit-scrollbar-thumb { background: #2a3345; border-radius: 2px; }
+      #cmd-palette .cmd-palette-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted, #6b7280); padding: 8px 18px 4px; font-weight: 600; }
+      #cmd-palette .cmd-palette-item { display: flex; align-items: center; gap: 10px; padding: 8px 18px; cursor: pointer; color: var(--text-primary, #eee); font-size: 13px; border-left: 2px solid transparent; }
+      #cmd-palette .cmd-palette-item.active { background: var(--bg-hover, #171d27); border-left-color: #6366f1; }
+      #cmd-palette .cmd-palette-icon { width: 32px; height: 32px; text-align: center; opacity: 0.9; flex: 0 0 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; }
+      #cmd-palette .cmd-palette-icon.sprite { background-color: transparent; }
+      #cmd-palette .cmd-palette-text { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 1px; }
+      #cmd-palette .cmd-palette-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #cmd-palette .cmd-palette-detail { font-size: 11px; color: var(--text-muted, #6b7280); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #cmd-palette .cmd-palette-status { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; box-shadow: 0 0 4px currentColor; }
+      #cmd-palette .cmd-palette-hint { font-size: 11px; color: var(--text-muted, #6b7280); font-family: ui-monospace, monospace; flex: 0 0 auto; }
+      #cmd-palette .cmd-palette-empty { padding: 18px; text-align: center; color: var(--text-muted, #6b7280); font-size: 13px; font-style: italic; }
+      #cmd-palette ul.cmd-palette-agents { list-style: none; margin: 0; padding: 0; }
+      #cmd-palette .cmd-palette-agent-wrap { padding: 0 8px; border-left: 2px solid transparent; }
+      #cmd-palette .cmd-palette-agent-wrap.active { border-left-color: #6366f1; background: var(--bg-hover, #171d27); }
+      #cmd-palette .cmd-palette-footer { padding: 8px 14px; border-top: 1px solid var(--border, #2c313a); font-size: 11px; color: var(--text-muted, #6b7280); display: flex; gap: 12px; align-items: center; }
+      #cmd-palette .cmd-palette-footer kbd { background: var(--bg-surface, #1a1f27); border: 1px solid var(--border, #2c313a); border-radius: 3px; padding: 1px 5px; font-family: ui-monospace, monospace; font-size: 10px; margin-right: 2px; color: var(--text-primary, #eee); }
+      /* ── CmdKHint floating banner ────────────────────────────────────────── */
+      #cmdk-hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 45; background: rgba(17, 20, 24, 0.92); border: 1px solid var(--border, #2c313a); border-radius: 22px; padding: 8px 14px 8px 18px; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.5); backdrop-filter: blur(8px); color: var(--text-primary, #eee); font-size: 13px; animation: cmdk-hint-in 0.4s ease both; }
+      #cmdk-hint kbd { background: var(--bg-surface, #1a1f27); border: 1px solid var(--border, #2c313a); border-radius: 4px; padding: 2px 7px; font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-primary, #eee); box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+      #cmdk-hint .cmdk-hint-text { opacity: 0.85; }
+      #cmdk-hint .cmdk-hint-close { background: transparent; border: none; color: var(--text-muted, #6b7280); cursor: pointer; font-size: 16px; padding: 0 2px 0 4px; line-height: 1; margin-left: 4px; }
+      #cmdk-hint .cmdk-hint-close:hover { color: var(--text-primary, #eee); }
+      @keyframes cmdk-hint-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
     </style>
   </head>
   <body>

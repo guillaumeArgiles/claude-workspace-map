@@ -17,6 +17,7 @@ import {
 import { NavGrid } from "../world/NavGrid";
 import { RPGApprovalUI } from "../ui/RPGApprovalUI";
 import { RPGAgentMenuUI } from "../ui/RPGAgentMenuUI";
+import { DragDropController } from "../services/DragDropController";
 
 const BACKGROUND_KEY = "workspace-background";
 
@@ -34,6 +35,7 @@ export class MapScene extends Phaser.Scene {
   // Managers
   private collision = new CollisionLayer(this);
   private npcManager = new NpcManager(this);
+  private dragDrop = new DragDropController(this, this.npcManager);
   private dialogue = new DialogueUI(this);
   private approvalUI = new RPGApprovalUI(this);
   // The player sprite is created lazily inside playerController.init(), so we
@@ -141,12 +143,16 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.startFollow(player, true, 0.12, 0.12);
 
     // Re-clamp camera + physics bounds whenever the canvas is resized.
+    // Camera follow uses lerp (0.12), which leaves the player off-centre for
+    // a few frames after a resize; centerOn() snaps the view back instantly.
     this.scale.on(
       Phaser.Scale.Events.RESIZE,
       () => {
         this.physics.world.setBounds(0, 0, GRID.width, GRID.height);
         this.cameras.main.setBounds(0, 0, GRID.width, GRID.height);
         this.cameras.main.setZoom(CAMERA_ZOOM);
+        const p = this.playerController.sprite;
+        if (p) this.cameras.main.centerOn(p.x, p.y);
       },
       this
     );
@@ -201,9 +207,14 @@ export class MapScene extends Phaser.Scene {
       this.playerController.highlightAgent(data.id);
     uiBus.on("highlight_agent", onHighlight);
 
+    // File drag-and-drop onto NPCs — drop a file on an agent to inject its
+    // absolute path into that agent's PTY (and open the terminal).
+    this.dragDrop.init();
+
     const cleanup = () => {
       this.agentSyncer.stop();
       uiBus.off("highlight_agent", onHighlight);
+      this.dragDrop.destroy();
     };
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, cleanup);
     this.events.once(Phaser.Scenes.Events.DESTROY, cleanup);

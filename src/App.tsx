@@ -4,6 +4,7 @@ import { MapScene } from "./game/scenes/MapScene";
 import { AgentSidebar } from "./components/AgentSidebar";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { CmdKHint } from "./components/CmdKHint";
 import type { AppConfig } from "../shared/config-schema";
 
 function applyTheme(cfg: AppConfig) {
@@ -24,19 +25,19 @@ function applyTheme(cfg: AppConfig) {
 export function App() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (!mountRef.current || gameRef.current) return;
 
+    const initialRect = mountRef.current.getBoundingClientRect();
     const game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: mountRef.current,
-      // width/height omitted — RESIZE mode fills the parent container exactly,
-      // so the canvas never overflows and map edges are always reachable by
-      // scrolling the camera to the bounds.
+      width: Math.round(initialRect.width),
+      height: Math.round(initialRect.height),
       backgroundColor: "#1a1a1a",
       pixelArt: true,
       roundPixels: true,
@@ -45,16 +46,33 @@ export function App() {
         arcade: { debug: false },
       },
       scale: {
-        // RESIZE: canvas = container size, no scaling, no overflow.
-        // Camera zoom + setBounds (in MapScene) handle what's visible.
-        mode: Phaser.Scale.RESIZE,
-        autoCenter: Phaser.Scale.CENTER_BOTH,
+        // NONE: we manage canvas size ourselves via scale.resize() (see the
+        // sidebar-toggle effect below and the window-resize listener). RESIZE
+        // mode reads window dimensions in some configurations, so it ignores
+        // the parent shrinking when the sidebar opens.
+        mode: Phaser.Scale.NONE,
+        autoCenter: Phaser.Scale.NO_CENTER,
       },
       scene: [MapScene],
     });
 
+    // Keep the canvas in lock-step with #game-mount via a ResizeObserver.
+    // Covers BOTH the sidebar toggle (mount width changes) AND native window
+    // resizes. More reliable than relying on Phaser's auto scale modes.
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry || !gameRef.current) return;
+      const cr = entry.contentRect;
+      const w = Math.round(cr.width);
+      const h = Math.round(cr.height);
+      if (w === 0 || h === 0) return;
+      gameRef.current.scale.resize(w, h);
+    });
+    resizeObserver.observe(mountRef.current);
+
     gameRef.current = game;
     return () => {
+      resizeObserver.disconnect();
       game.destroy(true);
       gameRef.current = null;
     };
@@ -71,12 +89,7 @@ export function App() {
       .catch(() => {});
   }, []);
 
-  // Tell Phaser to recompute its display size when the sidebar toggles, so the
-  // canvas reflows to the new available width instead of staying squashed.
-  useEffect(() => {
-    const id = window.setTimeout(() => gameRef.current?.scale.refresh(), 250);
-    return () => window.clearTimeout(id);
-  }, [sidebarCollapsed]);
+  // (Sidebar toggle reflow is handled by the ResizeObserver above.)
 
   return (
     <>
@@ -112,6 +125,7 @@ export function App() {
           onChange={(cfg) => { setConfig(cfg); applyTheme(cfg); }}
         />
       )}
+      <CmdKHint hidden={!sidebarCollapsed} />
     </>
   );
 }
