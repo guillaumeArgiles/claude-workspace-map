@@ -96,6 +96,74 @@ The right panel gives a full operational view of your fleet:
 
 ---
 
+### Command palette — `⌘K` / `Ctrl+K`
+
+A VS Code-style palette is the single entry point to every action and every running agent. Type to fuzzy-match, ↑↓ to navigate, ↵ to act.
+
+- **Actions** — `New Claude session`, `Summon the Professor`, `Open Settings`, `View workspace stats`, `Enable desktop notifications`, `Clear N inactive agents`. Each action shows its keyboard shortcut as a discoverable hint.
+- **Agents** — every live session appears as a sidebar-style row (sprite, status, sub-agents, pending-approval widget, dismiss × on hover) grouped by project. Search matches on project name, status, tool, tool detail, sessionId.
+
+The palette doubles as a keyboard cheat-sheet — no more guessing what `B` or `,` does.
+
+---
+
+### Agent context menu — `Space`
+
+Walk up to any agent and press `Space` for a quick-action RPG menu — five gated actions on a single row:
+
+| Key | Action | When |
+|---|---|---|
+| `[1]` | Open conversation | always |
+| `[2]` | View plan | only if a plan is pending |
+| `[3]` | Ask a question (`/btw`) | only if a PTY is linked |
+| `[4]` | Work faster (`/fast` + whip animation) | only if a PTY is linked |
+| `[5]` | Kill the agent (with death animation) | always |
+
+Each action writes directly to the agent's PTY — no terminal switching.
+
+---
+
+### Drag-and-drop NPCs
+
+Grab any agent on the map and drop them on a different house to move that Claude session into another project room. The teacher walks home, the room banner updates, and the next NPC inherits the slot.
+
+A bidirectional palette → map drag also works: drag a project group from the palette onto a building.
+
+---
+
+### Workspace insights — `D`
+
+Local-only dashboard computed straight from your `~/.claude/projects/*.jsonl` files — no telemetry, no event collection.
+
+- **Sessions / Tokens / Tool calls / Plans accepted** KPIs (compact `Intl.NumberFormat`-formatted)
+- **Sessions per day** line chart
+- **Top tools** bar chart
+- **Top projects by sessions** pie chart
+- Filter by project, range `7 days / 30 days / All time`
+
+Reads JSONL incrementally — opening the dashboard is instant even with months of history.
+
+---
+
+### Settings panel — `,`
+
+Persisted in `~/.claude-workspace-map/config.json`:
+
+- **Theme** — dark / light, live preview
+- **Sidebar width** — 200–600 px, live preview
+- **Server port** — read-only (restart to change)
+- **Language** — English / Français / Español, switches the entire UI instantly
+
+---
+
+### Multilingual — EN / FR / ES
+
+Every label, button, dialogue line, status badge and dashboard chart title is translatable. The first-run locale is auto-detected from `navigator.language`; switching it in Settings updates the whole app (React UI + Phaser dialogues) on the fly.
+
+Numbers and dates respect the locale (`8.2B` in English → `8,2 Md` in French → `8158,9 M` in Spanish). Plurals are computed with `Intl.PluralRules`.
+
+---
+
 ### A\* pathfinding
 
 Agents navigate around furniture and walls on a 24 px collision grid — no more clipping through desks. The player's autopilot (click-to-walk) uses the same grid with line-of-sight smoothing.
@@ -118,13 +186,19 @@ Agents spawned by `Agent(…)` tool calls appear as student NPCs, work alongside
 
 | Key | Action |
 |---|---|
+| `⌘K` / `Ctrl+K` | Open command palette |
 | `N` | Open spawn panel |
 | `P` | Spawn / open Professor |
 | `E` | Talk to nearest NPC |
+| `Space` | Open agent context menu (terminal / plan / btw / fast / kill) |
+| `Tab` | Cycle player through agents |
 | `1` / `2` / `3` | Jump player to house 1 / 2 / 3 |
-| `Backspace` | Bulk clear idle/done agents |
+| `D` | Open workspace insights dashboard |
+| `,` | Open Settings |
+| `S` | Toggle sidebar list |
 | `B` | Request desktop notification permission |
-| `Escape` | Close terminal / dismiss dialogue |
+| `Backspace` | Bulk clear idle/done agents |
+| `Escape` | Close terminal / dismiss dialogue / close palette |
 
 ---
 
@@ -262,6 +336,12 @@ Each `.jsonl` file is one Claude Code session. The watcher reads new bytes as th
 - [x] Desktop notifications on `awaiting_approval` / `blocked` transitions
 - [x] Professor NPC — AI orchestrator that briefs you on your fleet's state
 - [x] Keyboard shortcuts for all major actions
+- [x] Agent context menu — `Space` for terminal / plan / `/btw` / `/fast` / kill
+- [x] Command palette — `⌘K` to act on any agent or run any action
+- [x] Drag-and-drop NPCs across rooms (re-home a session on the map)
+- [x] Persistent settings — theme, sidebar width, port, language
+- [x] Workspace insights — local dashboard from JSONL transcripts (no telemetry)
+- [x] Internationalisation — English / Français / Español, live switch
 - [ ] Chat panel — send free-text messages to any running agent
 - [ ] Proactive Professor — suggests tasks when all sessions are idle
 
