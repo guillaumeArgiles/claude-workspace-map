@@ -1,16 +1,22 @@
 /**
  * Le Professeur — orchestrateur du workspace.
  *
- * Spawne une session Claude Code dans un dossier dédié avec un CLAUDE.md
- * qui définit le rôle du Professeur et injecte le snapshot des agents actifs.
+ * Spawne une session Claude Code dans un dossier dédié avec :
+ * - un `CLAUDE.md` qui définit le rôle du Professeur + un snapshot initial des
+ *   agents,
+ * - un `.mcp.json` qui branche le MCP server de FleetView pour que le Professeur
+ *   puisse inspecter ET piloter la fleet en live (list/get/spawn/send/kill).
+ *
  * Réutilise l'infra PTY existante — aucune clef API supplémentaire requise.
  */
 
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 import type { AgentState } from "../shared/agent-types.js";
 import { ptyManager } from "./pty-manager.js";
+import { readConfig } from "./config-store.js";
 import { child } from "./logger.js";
 
 const log = child("professor");
@@ -20,6 +26,43 @@ export const PROFESSOR_DIR = path.join(
   ".claude-workspace-map",
   "professor"
 );
+
+/**
+ * Chemin absolu vers l'entrée du MCP server, dérivé de l'emplacement de ce
+ * fichier (en dev : `/.../server/professor.ts` → `/.../server/mcp/main.ts`).
+ *
+ * NOTE packaging : en build Electron, ce chemin pointera dans l'ASAR — et
+ * tsx ne sera plus disponible. À résoudre quand on packagera (extraire main.js
+ * compilé en dehors de l'ASAR, ou utiliser node + js pré-build).
+ */
+const MCP_SERVER_ENTRY = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "mcp",
+  "main.ts"
+);
+
+// ── .mcp.json template ────────────────────────────────────────────────────────
+
+/**
+ * Configuration MCP injectée dans le dossier du Professeur. Claude Code la
+ * détecte au boot et propose les tools `claude-workspace-map__*` au modèle.
+ *
+ * Note sécurité Claude Code : à la première détection d'un nouveau .mcp.json,
+ * l'utilisateur reçoit un prompt pour autoriser le serveur. C'est volontaire
+ * côté Claude Code (anti-supply-chain). One-time, ensuite c'est OK.
+ */
+function buildMcpConfig(port: number): string {
+  const config = {
+    mcpServers: {
+      "claude-workspace-map": {
+        command: "npx",
+        args: ["tsx", MCP_SERVER_ENTRY],
+        env: { FLEETVIEW_PORT: String(port) },
+      },
+    },
+  };
+  return JSON.stringify(config, null, 2);
+}
 
 // ── CLAUDE.md template ────────────────────────────────────────────────────────
 
@@ -49,18 +92,47 @@ ou tu proposes une action concrète — jamais les deux en même temps.
 Tu tutoies l'utilisateur. Tes réponses sont courtes par défaut (3-6 lignes),
 l'utilisateur peut demander plus.
 
-## Sessions Claude Code actives (snapshot au démarrage de cette conversation)
+## Tu vois et tu agis sur la fleet via MCP
+
+Tu as accès au MCP server **claude-workspace-map** qui expose 5 tools :
+
+- \`list_agents\` — snapshot temps réel de toutes les sessions Claude actives
+  (sessionId, projet, status, tool en cours, approbation en attente).
+- \`get_agent_status\` — détail complet d'une session par sessionId
+  (subAgents, pendingPlan, pendingQuestions).
+- \`spawn_agent\` — lance une nouvelle session Claude dans un cwd, avec un
+  prompt initial optionnel envoyé après ~1.5s.
+- \`send_message\` — écrit du texte dans une session existante. Terminer par
+  \`\\r\` pour valider la commande.
+- \`kill_agent\` — termine une session (kill du PTY).
+
+**Règle d'or** : appelle \`list_agents\` au début de CHAQUE message utilisateur
+pour voir l'état actuel. Le snapshot ci-dessous est figé au démarrage de cette
+conversation — utile pour le contexte initial, mais probablement périmé.
+
+## Snapshot agents au démarrage
 
 ${snapshot}
 
 Format : [projet] statut · outil — détail
 Statuts possibles : planning, coding, running_tool, awaiting_approval, idle, done, blocked.
 
-## Tes priorités
+## Tes priorités (dans l'ordre)
 
 1. Si un agent est \`awaiting_approval\` ou \`blocked\` → signale-le en premier, c'est urgent.
 2. Si tous les agents codent tranquillement → propose du travail de fond à l'utilisateur.
 3. Si des agents sont \`idle\` ou \`done\` → suggère de nouveaux chantiers à lancer.
+
+## Quand utiliser les actions (spawn / send / kill)
+
+Tu agis seulement sur demande explicite de l'utilisateur. Pas d'initiative.
+
+- "Lance un agent qui fait X dans le projet Y" → \`spawn_agent({cwd: '/path/to/Y', prompt: 'X'})\`.
+- "Dis à l'agent du projet X de faire Y" → trouve le sessionId via list_agents,
+  puis \`send_message({sessionId, text: 'Y\\r'})\`.
+- "Tue l'agent X" → \`kill_agent({sessionId})\`.
+
+Sinon, tu lis (\`list_agents\` / \`get_agent_status\`) et tu conseilles.
 
 ## Activités que tu proposes (adapte au contexte)
 
@@ -82,8 +154,9 @@ Statuts possibles : planning, coding, running_tool, awaiting_approval, idle, don
 
 ## Pour commencer
 
-À la première question ("Que dois-je faire maintenant ?"), réponds directement
-sans préambule ("Bien sûr !", "Voici…", etc.). Format :
+À la première question ("Que dois-je faire maintenant ?"), commence par
+\`list_agents\` pour rafraîchir, puis réponds sans préambule ("Bien sûr !",
+"Voici…", etc.). Format :
 1. **Statut en une phrase** — ce qui se passe en ce moment chez les agents.
 2. **Action prioritaire** — ce que tu ferais à la place de l'utilisateur, maintenant.
 3. **Proposition de sujet** — une activité concrète sur laquelle travailler pendant que les agents bossent.
@@ -93,20 +166,34 @@ sans préambule ("Bien sûr !", "Voici…", etc.). Format :
 // ── Spawn ─────────────────────────────────────────────────────────────────────
 
 /**
- * Crée le dossier dédié, écrit un CLAUDE.md frais avec le snapshot agents,
- * puis spawne une session Claude Code via le pty-manager existant.
+ * Crée le dossier dédié, écrit `CLAUDE.md` + `.mcp.json` (avec le port FleetView
+ * courant injecté), puis spawne une session Claude Code via le pty-manager.
  * Retourne le ptyId pour que le client ouvre une TerminalOverlay.
  */
 export async function spawnProfessor(agents: AgentState[]): Promise<string> {
   await fs.mkdir(PROFESSOR_DIR, { recursive: true });
-  await fs.writeFile(
-    path.join(PROFESSOR_DIR, "CLAUDE.md"),
-    buildClaudeMd(agents),
-    "utf8"
-  );
+
+  // Read port at spawn time — the user may have changed it via Settings.
+  const { port } = await readConfig();
+
+  await Promise.all([
+    fs.writeFile(
+      path.join(PROFESSOR_DIR, "CLAUDE.md"),
+      buildClaudeMd(agents),
+      "utf8"
+    ),
+    fs.writeFile(
+      path.join(PROFESSOR_DIR, ".mcp.json"),
+      buildMcpConfig(port),
+      "utf8"
+    ),
+  ]);
 
   const ptyId = ptyManager.spawn(PROFESSOR_DIR);
-  log.info({ ptyId, agentCount: agents.length }, "professor spawned");
+  log.info(
+    { ptyId, agentCount: agents.length, port, mcpEntry: MCP_SERVER_ENTRY },
+    "professor spawned with MCP wiring"
+  );
 
   // Give Claude ~1.5 s to start up, then send a prompt so he speaks first
   // without waiting for the user to type anything.
