@@ -190,7 +190,7 @@ But : démontrer une willingness to pay.
 - [ ] **PT.2** Bus factor : code propre + ADRs + docs continus
 - [ ] **PT.3** Dogfooding : utiliser le widget chaque jour, noter friction
 - [ ] **PT.4** User interviews : 2 calls/sem à partir Phase 2
-- [ ] **PT.5** Split `NpcManager` (619 lignes) : extraire `CharacterSpriteFactory` (buildCharacterAnimations + ensureCleanedTexture + drawPlaceholderFrame) du `NpcManager` (lifecycle / wander / overlays). Cible ≤ 400 lignes chacun. À programmer dans Sprint 2 ou 3.
+- [x] **PT.5** Split `NpcManager` (685 → 444 lignes) : `CharacterSpriteFactory` extrait (280 lignes), NpcManager garde lifecycle + wander + overlays. Livré 2026-05-30 (`e578fa9`). 68/68 tests verts.
 
 ---
 
