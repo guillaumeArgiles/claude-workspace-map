@@ -1,218 +1,272 @@
-# Backlog — Claude Workspace Map
+# Backlog technique — Claude Workspace Map
 
-Backlog produit pour la roadmap **12 mois → exit Anthropic**.
+## Manifeste
 
-Référence : Plan complet disponible localement (non versionné).
+Ce backlog est un **terrain de jeu solo**. Pas de deadline, pas d'users (encore). Tu picks un thème qui te fait envie, tu shippes quand ça te plaît, tu apprends.
+
+**Objectif réel** : monter en compétence en construisant un truc qu'on a vraiment envie d'utiliser.
+
+La stratégie produit/launch (décisions de ce qu'on supprime, à quel moment on lance, gates de décision) vit dans [STRATEGY.md](STRATEGY.md). À ressortir le jour où on switch en mode "ship".
 
 Conventions :
-- `S<phase>.<num>` = story du sprint (ex: `S1.1`)
-- `P<phase>.<num>` = chantier transverse de phase
-- Statut : `[ ]` pas commencé · `[~]` en cours · `[x]` livré · `[!]` bloqué
+- `T<thème>.<num>` = story d'un thème (ex: `TA.1` = Game dev, story 1)
+- Statut : `[ ]` pas commencé · `[~]` en cours · `[x]` livré · `[!]` bloqué · `[?]` à arbitrer
 
 ---
 
-## Phase 1 — Foundation Pro (M1-M2)
+## Reliquats Phase 1-2 (gardés pour mémoire)
 
-But : PoC → outil installable, stable, partageable.
+Stories du backlog originel encore ouvertes. Soit reportées au launch (cf STRATEGY.md), soit candidates aux thèmes ci-dessous.
 
-### Sprint 1 — Stabilisation (en cours)
-
-- [x] **S1.1** Refactor `MapScene.ts` en 7 modules (~4j) — livré en 5 commits
-- [ ] **S1.2** Reconnect SSE robuste + React ErrorBoundary (~1j)
-- [ ] **S1.3** Logger structuré server-side + cleanup `console.*` (~0.5j)
-- [ ] **S1.4** Vitest setup + tests sur `parser.ts` (~1j)
-- [ ] **S1.5** ADR 0001 — décision PTY/tmux (~0.5j)
-
-### Sprint 2 — Types stricts + tests étendus + pathfinding
-
-- [x] **S2.1** Zod pour valider chaque ligne JSONL avant parsing — livré. Schémas dans `server/schemas.ts` (JsonlLine, ContentBlock union, Message). `parseLine` utilise `safeParse` + sink injectable pour la télémétrie (server.ts log debug). Élimine les casts `as Record<string, unknown>` du parser. 4 nouveaux tests prouvent que le sink fire sur garbage / silencieux sur JSON malformé.
-- [x] **S2.2** Tests sur `server/watcher.ts` (add/change/unlink, byte offset, sub-agents) — livré. 17 specs dans `server/watcher.test.ts` couvrant : spawn/update/dedup byte-offset, split-line pending buffer, unlink, ghost files, dérivation de status, sub-agent lifecycle complet (spawn → tool → finish), Notification/SessionEnd/unknown/missing-fields, fenêtre active 30 min.
-- [x] **S2.3** Strict TS settings (noUnusedLocals, noUnusedParameters, noImplicitReturns) — livré. Inclut aussi `server/` et `shared/` dans `tsconfig.include` (couvre maintenant tout le monorepo, plus juste `src/`). @types/node installé. Fallout fixé : import default `pino` (vs nommé), `import { type FSWatcher }` chokidar, typage explicite des handlers `add`/`change`/`unlink`, dead import `logger` retiré dans `server/index.ts`.
-- [x] **S2.4** CI GitHub Actions : tsc + vitest sur PR + push master — livré. `.github/workflows/ci.yml`, scripts `npm run typecheck` + `npm test`, pin Node 22 via `.nvmrc`, cache npm + concurrency guard pour annuler les runs sur force-push. Lint exclu (pas d'ESLint config dans le repo) — voir PT.6.
-- [ ] **PT.6** Setup ESLint + intégration au workflow CI (~0.5j). Strict TS couvre déjà la plupart des fautes courantes ; intérêt principal = consistance de style si on hire un freelance.
-- [x] **S2.5** **Pathfinding A\* grid-based** pour le player (auto-walk) ET les NPCs (wander) — livré
-  - `src/game/world/NavGrid.ts` : nav-grid 24px construite depuis `collisions.json` + margin 24px
-  - A* 8-direction, heuristique Chebyshev, smoothing line-of-sight, anti corner-cutting
-  - `PlayerController.startAutoWalk` consomme `findPath` (fallback heuristique entrance si pas de grid)
-  - `NpcManager.pickWanderTarget` consomme `randomWalkableNear` (fallback random)
-  - 14 tests vitest (`NavGrid.test.ts`), tous verts
-  - Restant (optionnel) : overlay debug ?nav, pas urgent pour le pain point user
-
-### Sprint 3 — Packaging Electron
-
-- [x] **S3.1** Bootstrap Electron + bundle Node server + Vite build — livré. `electron/main.ts` + `electron/preload.ts`; `electron.vite.config.ts` (main 21 kB bundle, preload 0.25 kB, renderer 7 MB Phaser); `server/index.ts` exports `startServer(port)`, `server/start.ts` standalone entry; `npm run dev:electron` / `package:dir`; smoke tested: `/api/state` responds from embedded server.
-- [x] **S3.2** Auto-update (electron-updater + GitHub releases) — livré. `setupAutoUpdater()` en prod, silent download, dialog on ready, `quitAndInstall`; `.github/workflows/release.yml` déclenché sur tag `v*`; `electron-builder.yml` avec publish GitHub provider.
-- [x] **S3.3** Icons + branding minimal — livré. `build/icon.svg` pixel-art, `build/icon.icns` (macOS iconutil), `build/icon.png` (Linux); favicon 32px dans `public/`; titre "Claude Workspace Map" partout.
-- [x] **S3.4** Build matrice macOS Apple Silicon / macOS Intel / Linux x64 — livré. `release.yml` matrix `--arm64 --x64` sur `macos-latest`, `--x64` sur `ubuntu-latest`; `fail-fast: false`; packaged .app testé localement (284 MB).
-
-### Sprint 4 — Onboarding + docs
-
-- [ ] **S4.1** Quick Start README (3 étapes max)
-- [ ] **S4.2** Page Settings in-app : port, projects watchés, génération snippet hooks
-- [ ] **S4.3** Vidéo demo 90s + screenshots
-- [ ] **S4.4** Landing page `claude-workspace.dev` (1 page Astro)
-- [ ] **S4.5** Public GitHub release + Show HN
-
-**Métrique de fin de phase** : 500 stars, 100 installs.
+| ID | Story | Verdict |
+|---|---|---|
+| S4.3 | Vidéo demo 90s | → STRATEGY.md (remplacée par Loom au launch) |
+| S4.5 | Public GitHub release + Show HN | → STRATEGY.md (Sprint Launch) |
+| S6.1 | tmux send-keys fallback | **Tué** — pivot terminal overlay couvre 95 % du besoin |
+| S6.4 | Politique sessions externes | **Tué** — même raison |
+| S7.4 | Notarisation macOS Developer ID | → STRATEGY.md (avant beta publique) |
+| S7.5 | Comportement par statut → POIs par maison | → **TA.4** (theme Game dev) |
+| S7.6 | Panneau Scheduled routines | → **TC.3** (theme Workspace intel) |
+| PT.6 | ESLint + CI | **Tué** — strict TS suffit en solo dev. Ressort si on hire. |
 
 ---
 
-## Phase 2 — Talk to Agents (M3-M4)
+## Thèmes actifs
 
-But : observateur → orchestrateur. "Wow moment" pour les démos.
+Six thèmes. Chaque thème = un sandbox cohérent. On peut bosser sur plusieurs en parallèle ou se concentrer sur un seul, comme on veut.
 
-### Sprint 5 — PTY launcher
+### Thème A — Game dev & Phaser avancé
 
-- [ ] **S5.1** Intégration `node-pty` côté server
-- [ ] **S5.2** `POST /api/sessions` : lance une session Claude dans un PTY (cwd, mode)
-- [ ] **S5.3** Mapping `pty.pid → session_id` via JSONL nouveau fichier
-- [ ] **S5.4** UI "Spawn Claude here" dans chaque house + "New session" dans sidebar avec sélecteur projet
+Skill : graphisme 2D, shaders, animation, game feel.
 
-### Sprint 6 — Talk to existing session
+- [ ] **TA.1** Day/night cycle dynamique
+  - Cycle 24h compressé en 30min réel
+  - Overlay lumière douce + ambiance changeante (palette filter)
+  - Lampadaires qui s'allument la nuit dans le jardin
+  - **Apprentissage** : Phaser pipelines, post-processing, color grading
+- [ ] **TA.2** Particle effects sur status change
+  - Sparkles violets quand un agent passe en `coding`
+  - Smoke quand `blocked`, étoiles dorées sur `awaiting_approval`
+  - Trail derrière le player quand il court
+  - **Apprentissage** : Phaser ParticleEmitter, easing functions
+- [ ] **TA.3** Shaders custom (GLSL)
+  - Water shader pour la fontaine du jardin
+  - Outline pixel-perfect autour de l'agent actif
+  - Distortion heat-shimmer au-dessus des desks "running_tool"
+  - **Apprentissage** : GLSL, Phaser pipeline API
+- [ ] **TA.4** POIs par statut (ex-S7.5)
+  - POIs dans chaque maison : `kanban_board`, `coding_desk`, `monitor_wall`, `meeting_table`, `coffee_corner`
+  - Mapping : `planning`/`awaiting_approval` → board ; `coding` (Edit/Write) → desk ; `running_tool` → desk ; `idle` → coffee_corner ; `awaiting_input` → board avec `?`
+  - NpcManager.wander étendu pour préférer le POI lié au statut
+  - **Apprentissage** : design pattern state machine + spatial AI
+- [ ] **TA.5** Camera cinematic mode
+  - Quand un agent finit un long task : zoom dramatique + fade-in d'un "🎉 task complete" banner
+  - Letterbox bars + slow pan quand le Professeur parle
+  - **Apprentissage** : Phaser camera FX, tween chains
+- [ ] **TA.6** Sprite customization
+  - Le user peut choisir son skin player (sélecteur dans Settings)
+  - Pack de 6-8 sprites Pipoya alternatives
+  - **Apprentissage** : asset management, persistance config
+- [ ] **TA.7** Mini-map
+  - Vue zoom-out coin haut-droit, toujours visible, dots colorés par agent status
+  - Cliquable pour téléport caméra
+  - **Apprentissage** : Phaser render texture, multi-camera
+- [ ] **TA.8** Sound design
+  - SFX subtils : footsteps, "ping" notification, "thunk" plan rejected
+  - Musique d'ambiance lo-fi en loop (toggle on/off dans Settings)
+  - **Apprentissage** : Phaser sound API, audio asset pipeline
 
-- [ ] **S6.1** Détection sessions tmux-aware + `tmux send-keys` fallback
-- [ ] **S6.2** Chat panel React (slide-in à droite) avec historique + input
-- [ ] **S6.3** Envoi via `pty.write` + streaming retour via JSONL watcher
-- [ ] **S6.4** Politique de gestion sessions externes (avertir user, re-lancer dans PTY, ignorer)
+### Thème B — Orchestration AI multi-agents
 
-### Sprint 7 — Réponses contextuelles + workspace vivant
+Skill : LLM apps, tool use, agent coordination — directement aligné métier 2026.
 
-- [ ] **S7.1** UI dédiée AskUserQuestion : parse questions, boutons radio, submit
-- [ ] **S7.2** Modal ExitPlanMode : afficher plan complet, Approve / Reject / Edit
-- [ ] **S7.3** Popup natif Notification (Electron) avec input réponse rapide
-- [ ] **S7.4** Notarisation macOS Developer ID + Linux AppImage signing
-- [ ] **S7.5** **Comportement par statut → lieu** (POIs par maison)
-  - POIs : `kanban_board` (haut centre), `coding_desk` (centre), `monitor_wall` (Monitoring), `meeting_table` (Review), `coffee_corner` (hors maison)
-  - Mapping : `planning`/`awaiting_approval` → board ; `coding` (Edit/Write) → desk ; `running_tool` (Bash/Read/Grep) → desk ; `idle` → coffee_corner ou wander libre ; `awaiting_input` (Notification) → board avec `?`
-  - NpcManager.wander étendu pour préférer le POI lié au statut (au lieu d'un random in radius)
-  - **Source** : pain point user (S1 feedback, "donner vie au workspace")
-- [ ] **S7.6** **Panneau Scheduled routines** sur la map
-  - Server : détecter d'où Claude Code stocke les scheduled tasks (probablement `~/.claude/scheduled-tasks.json` ou via le MCP `scheduled-tasks` bridgé). À investiguer en début de story.
-  - `GET /api/routines` : liste les routines avec name / cron / nextRun / lastRun / lastStatus
-  - UI : nouveau panneau pixel art dans le jardin (à côté du panneau "AI AGENT WORKSPACE"), au clic → modal avec la liste détaillée + animation "fires now" quand une routine déclenche
-  - **Source** : user — "routine de Claude Code que j'aimerais retrouver"
+- [ ] **TB.1** Le Professeur spawn d'autres agents
+  - Le Professeur peut décider de lancer un agent Claude pour une sous-tâche
+  - UI : voir le Professeur "appeler" un nouvel NPC sur la map (spawn animation)
+  - **Apprentissage** : multi-agent patterns, prompt engineering pour delegation
+- [ ] **TB.2** Agent-to-agent dialogues
+  - Deux NPCs peuvent se "parler" (le Professeur orchestre, échange info)
+  - Bulles de dialogue qui rebondissent entre eux
+  - **Apprentissage** : message passing entre processus Claude
+- [ ] **TB.3** Voice input pour le Professeur
+  - Bouton micro → STT (Web Speech API ou Whisper local) → PTY write
+  - **Apprentissage** : Web Speech API, accessibility, latency optim
+- [ ] **TB.4** TTS pour les dialogues agents
+  - Quand le Professeur parle, voix synthétique (browser TTS ou Coqui local)
+  - Voix différentes selon le rôle (architecte = grave, debugger = nerveux)
+  - **Apprentissage** : prosody, voice cloning ?
+- [ ] **TB.5** Mémoire persistante des agents
+  - Chaque NPC garde un journal de bord (markdown) entre sessions
+  - Affichable au E (dialogue "Voici ce que j'ai fait la dernière fois")
+  - **Apprentissage** : agent memory patterns, vector stores ?
+- [ ] **TB.6** Personality cards
+  - Chaque agent a une persona (system prompt custom) éditable depuis l'app
+  - Templates : "Senior architect", "QA paranoid", "Speed demon", "Yoda mode"
+  - **Apprentissage** : prompt design, A/B testing prompts
+- [ ] **TB.7** FleetView comme MCP server
+  - Exposer la map + agents en MCP : un Claude peut lire l'état de la fleet
+  - Tools : `list_agents`, `spawn_agent`, `send_message`, `kill_agent`
+  - **Apprentissage** : protocole MCP, server-side tool implementation
 
-### Sprint 8 — Polish + métriques
+### Thème C — Workspace intelligence
 
-- [ ] **S8.1** Local insights dashboard — agréger `~/.claude/projects/*/` JSONL en KPI (sessions, tokens par modèle, top outils, top projets, plan accept rate) + 3 charts (sessions/jour, top outils, top projets). Modal plein écran ouverte par palette + raccourci `D`. Aucune télémetry, aucune collecte serveur, aucun consentement (pivot 2026-05-30 — les données existent déjà sur la machine, on les rend lisibles).
-- [ ] **S8.2** Raccourcis clavier : 1/2/3 = jump entre houses, Cmd+K chat, drag-n-drop fichiers
-- [ ] **S8.3** Public Beta launch (Product Hunt + Twitter + HN)
+Skill : data viz, git internals, transform JSONL → insight.
 
-**Métrique de fin de phase** : 200 DAU, NPS ≥ 50, 5-10 témoignages filmés.
+- [ ] **TC.1** Git overlay par house
+  - Badge sur chaque maison : `+12 -3 ⚠ uncommitted` (depuis dernier commit)
+  - Animation "leaf" quand un commit est créé en live
+  - **Apprentissage** : isomorphic-git ou simple-git, file watching
+- [ ] **TC.2** Diff viewer dans terminal overlay
+  - Tab "Recent changes" qui liste les fichiers modifiés par la session, click → diff inline
+  - **Apprentissage** : diff parsing, monaco editor (?) embedding
+- [ ] **TC.3** Panneau Scheduled routines (ex-S7.6)
+  - Détection des scheduled tasks (probablement `~/.claude/scheduled-tasks.json` ou via MCP `scheduled-tasks`)
+  - `GET /api/routines` : liste avec name / cron / nextRun / lastRun / lastStatus
+  - UI : panneau pixel art dans le jardin, animation "fires now" quand une routine déclenche
+  - **Apprentissage** : cron parsing, FS watching de répertoires non-projets
+- [ ] **TC.4** Replay mode
+  - Scrubber temporel en bas : tu rejoues l'historique d'une session JSONL
+  - Les NPCs bougent, les bulles de dialogue ressortent
+  - **Apprentissage** : timeline UI, event sourcing replay
+- [ ] **TC.5** Cost tracker animé
+  - Pièces (coins) qui tombent dans une jarre quand un agent dépense des tokens
+  - Total visible, alarme rouge au-delà d'un seuil settings
+  - **Apprentissage** : data viz ludique, settings reactivity
+- [ ] **TC.6** Stats dashboard v2
+  - Ajouter : burn rate par jour, top 10 prompts récurrents, ratio plan-accept/reject par projet
+  - Drill-down par projet (click sur une maison → stats filtrées)
+  - **Apprentissage** : query optimization sur JSONL, charts avancés
+- [ ] **TC.7** Session timeline scrubber sur la map
+  - Bouton "Show today's history" : les NPCs trail leur position au cours de la journée
+  - Heatmap d'activité par house
+  - **Apprentissage** : temporal data viz, animation chaining
+
+### Thème D — Performance & scale (skill système)
+
+Skill : profiling, optim, architecture distribuée.
+
+- [ ] **TD.1** 100+ agents à 60fps
+  - Stress test : simuler 200 agents avec mock data
+  - Identifier les bottlenecks (Phaser update loop ? SSE bandwidth ?)
+  - Optims : sprite batching, culling hors-vue, throttle SSE
+  - **Apprentissage** : Chrome DevTools profiler, Phaser perf patterns
+- [ ] **TD.2** Web Worker pour le parser JSONL
+  - Bouger `server/parser.ts` côté browser web worker
+  - Décharge le main thread quand 500+ lignes JSONL streamées
+  - **Apprentissage** : Web Workers, Comlink, message passing
+- [ ] **TD.3** JSONL streaming avec disk cache
+  - Pour les gros projets : ne pas relire tout le fichier à chaque démarrage
+  - Index byte-offset + dernière ligne lue persistée
+  - **Apprentissage** : disk I/O patterns, cache invalidation
+- [ ] **TD.4** WebGL particle pool pour scale
+  - Si TA.2 (particles) scale mal avec 100+ agents, switch en GPU particles
+  - **Apprentissage** : WebGL instancing, GPU compute basics
+
+### Thème E — Platform & extensibility
+
+Skill : architecture plugins, distribution multi-platform.
+
+- [ ] **TE.1** Mobile companion (read-only)
+  - QR code pair depuis l'app desktop, browser mobile affiche une vue read-only
+  - Cas d'usage : tu cuisines pendant qu'un agent compile, glance rapide sur le tel
+  - **Apprentissage** : WebRTC peer-to-peer, responsive design contraint
+- [ ] **TE.2** CLI tool `fleet` companion
+  - `fleet status` (liste agents en JSON), `fleet kill <id>`, `fleet spawn`
+  - Communique avec le serveur embedded via REST
+  - **Apprentissage** : CLI design, packaging Node CLI tools (oclif ?)
+- [ ] **TE.3** Theme system complet
+  - Settings : choisir entre 3-5 themes (pixel-art classic, neon synthwave, terminal green, parchment fantasy)
+  - Skins de tilemap + palette + UI
+  - **Apprentissage** : design tokens, theming patterns
+- [ ] **TE.4** Plugin API (NPCs scriptables)
+  - Folder `~/.fleetview/plugins/*.js` chargé au boot
+  - API : `onAgentStatusChange`, `onNewSession`, `addCustomNPC`
+  - **Apprentissage** : sandboxing, plugin lifecycle, hot reload
+- [ ] **TE.5** Tilemap editor in-app
+  - Mode édition : drag tiles depuis une palette, sauvegarde le custom layout
+  - **Apprentissage** : Phaser tilemaps, undo/redo, serialization
+- [ ] **TE.6** Web build (sans Electron)
+  - Variant qui tourne dans le browser, JSONL upload manuel (drag-n-drop)
+  - Démo zero-install pour curieux
+  - **Apprentissage** : feature flags entre Electron/web, file API limits
+
+### Thème F — Multiplayer & social (R&D)
+
+Skill : real-time sync, CRDT, P2P. Plus expérimental.
+
+- [ ] **TF.1** Local WebRTC peer-to-peer
+  - Deux machines même wifi : voir les agents de l'autre dans la même map
+  - Pas de serveur cloud, NAT traversal via STUN public
+  - **Apprentissage** : WebRTC, signaling, CRDTs basiques (yjs ?)
+- [ ] **TF.2** Watch mode (read-only stream)
+  - Tu donnes un lien à un pote, il voit ta map live (pas d'interaction)
+  - **Apprentissage** : tunneling (ngrok-like ?), auth lightweight
+- [ ] **TF.3** Cooperative debug mode
+  - Deux users contrôlent leur player respectif, peuvent interagir avec les mêmes agents
+  - Chat texte intégré
+  - **Apprentissage** : conflict resolution, operational transform
 
 ---
 
-## Phase 3 — Team mode + premiers revenus (M5-M6)
+## Spikes / R&D (1-jour explorations)
 
-But : démontrer une willingness to pay.
+Pas une feature, juste explorer une techno. Si ça mène quelque part → on transforme en story dans le thème adéquat.
 
-### Sprint 9 — Auth + Cloud sync
-
-- [ ] **S9.1** Backend cloud minimal (Cloudflare Workers + D1 ou Supabase)
-- [ ] **S9.2** Magic link auth (Resend ou Postmark)
-- [ ] **S9.3** Toggle "Sync with team" : push état local, pull autres
-- [ ] **S9.4** RGPD : on ne stocke QUE metadata (cwd, projectName, status, lastActivityAt)
-
-### Sprint 10 — Multi-machine view
-
-- [ ] **S10.1** Sidebar : sections par machine
-- [ ] **S10.2** Avatars distincts pour agents pilotés par d'autres humains
-- [ ] **S10.3** Permissions : read-only sur sessions des autres par défaut
-
-### Sprint 11 — Pricing + paiement
-
-- [ ] **S11.1** Stripe integration (subscriptions $12/user/mois)
-- [ ] **S11.2** Page pricing landing
-- [ ] **S11.3** Trial 14j + paywall sync cloud
-
-### Sprint 12 — Marketing push
-
-- [ ] **S12.1** Outreach LinkedIn/Twitter aux 200 DAU actifs (interviews, témoignages)
-- [ ] **S12.2** Articles invités (Console.dev, Bytes.dev, dev.to)
-- [ ] **S12.3** Conférences locales si timing OK
-- [ ] **S12.4** **Premiers contacts DevRel Anthropic** — pitch produit, feedback, pas encore "à vendre"
-
-**Métrique de fin de phase** : 5 équipes payantes (50 user accounts), 500 DAU.
+- [ ] **Spike-GLSL** — Apprendre Phaser pipeline + écrire un shader simple (~1j)
+- [ ] **Spike-MCP** — Lire la spec MCP, écrire un serveur minimal qui expose `list_agents` (~1j)
+- [ ] **Spike-Whisper** — STT local avec whisper.cpp wasm, mesurer latency (~0.5j)
+- [ ] **Spike-Yjs** — Sync deux instances FleetView en local via yjs (~1j)
+- [ ] **Spike-Bun** — Tenter de remplacer Node par Bun pour le serveur embedded (~0.5j)
 
 ---
 
-## Phase 4 — Pré-deal (M7-M9)
-
-### Sprint 13-14 — Notifications + intégrations
-
-- [ ] **S13.1** Notifs natives macOS/Linux pour `awaiting_approval` + `blocked`, action inline
-- [ ] **S13.2** Slack integration (status pings équipe)
-- [ ] **S13.3** Discord integration
-- [ ] **S14.1** GitHub integration (lier sessions aux PRs)
-
-### Sprint 15-16 — Performance + scale
-
-- [ ] **S15.1** Optim chokidar pour 500+ JSONL files (eviction + index)
-- [ ] **S15.2** Backend cloud : indexes proper, p99 < 100ms
-- [ ] **S16.1** Stress test : 50 sessions simultanées sur 1 machine
-
-### Sprint 17-18 — Présentation publique
-
-- [ ] **S17.1** Public launch V1 (Product Hunt top 5 visé)
-- [ ] **S17.2** Coverage presse (The New Stack, InfoQ, Anthropic blog)
-- [ ] **S18.1** **Premier contact concret Anthropic** — conversation business, LOI/term sheet préliminaire
-
-**Métrique de fin de phase** : 2000 DAU, 30 équipes payantes (~$20k MRR), 1 conversation acquisition en cours.
-
----
-
-## Phase 5 — Closing (M10-M12)
-
-### Sprint 19-20 — Due diligence ready
-
-- [ ] **S19.1** Audit dépendances (Snyk) + licences (FOSSA)
-- [ ] **S19.2** Documentation technique exhaustive (ADRs, runbooks, schémas)
-- [ ] **S20.1** Audit légal : statuts entreprise, IP transferable, CGU, RGPD
-
-### Sprint 21-22 — Négociation deal
-
-- [ ] **S21.1** Avocat M&A
-- [ ] **S21.2** Pitch deck acquisition (différent du sales deck)
-- [ ] **S22.1** Term sheet négociée (earn-out vs cash up-front)
-- [ ] **S22.2** Approches secondaires si Anthropic traîne (Cursor, MS DevDiv, GitHub)
-
-### Sprint 23-24 — Closing ou pivot
-
-- [ ] **S23.1** Signing si deal OK
-- [ ] **S23.2** Plan transition tech + équipe
-- [ ] **S24.1** Si pas de deal : pivot SaaS, reprendre 12-18 mois avec metrics solides
-
----
-
-## Chantiers transverses (toutes phases)
+## Chantiers transverses
 
 - [x] **PT.1** Mutualiser `STATUS_COLOR`/`STATUS_LABEL` dans `shared/agent-ui.ts` — fait dans S1.1.A (commit 56faa62)
-- [ ] **PT.2** Bus factor : code propre + ADRs + docs continus
-- [ ] **PT.3** Dogfooding : utiliser le widget chaque jour, noter friction
-- [ ] **PT.4** User interviews : 2 calls/sem à partir Phase 2
-- [x] **PT.5** Split `NpcManager` (685 → 444 lignes) : `CharacterSpriteFactory` extrait (280 lignes), NpcManager garde lifecycle + wander + overlays. Livré 2026-05-30 (`e578fa9`). 68/68 tests verts.
+- [ ] **PT.2** Bus factor : code propre + ADRs + docs continus (continu, pas une story)
+- [x] **PT.5** Split `NpcManager` (685 → 444 lignes) : `CharacterSpriteFactory` extrait — livré 2026-05-30 (`e578fa9`)
 
 ---
 
-## Idées non priorisées
+## Idées dans la salle d'attente
 
-À garder pour plus tard ou parking lot :
-- Day/night cycle visuel basé sur l'heure réelle
-- Statistiques par session (temps moyen, nombre de tools, coût estimé)
-- History timeline dans la bulle de dialogue (dernières N actions)
-- Vue mini-map (zoom out vue d'ensemble)
+Tu picks si l'envie te prend, sinon ça reste là.
+
+- Animation spawn maison quand 1er agent arrive
 - Filtrage sidebar par statut/projet/role
 - Click sur projet header pour collapse/expand
-- Sound effects (notification, blocked, etc.)
-- Animation spawn maison quand 1er agent arrive
+- History timeline dans la bulle de dialogue (dernières N actions)
+- "Pet" Phaser : un chat qui suit le player et dort quand l'agent est idle
+- Achievements/badges (ton premier agent, 100 sessions, etc.)
+- Easter eggs (konami code, secret room derrière la fontaine, etc.)
+- Capture GIF in-app pour partager une session marquante
+- Tutoriel onboarding interactif (player-controlled, premier lancement)
 
-## Décisions PO récentes (feedback user → bucket)
+---
 
-Triage du 2026-05-24 sur 4 idées remontées par dogfooding :
+## Comment décider quoi prendre
+
+Trois questions guides avant de commencer une story :
+
+1. **Est-ce que ça m'amuse ?** (sinon → suivante)
+2. **Est-ce que ça m'apprend quelque chose que je veux savoir en 2026 ?** (skills LLM, Phaser, real-time, perf — tous OK)
+3. **Est-ce que je peux la finir en 1-3 jours ?** (sinon découper)
+
+Pas de pression de finir un thème entier avant le suivant. Pas de pression de livrer dans un ordre. Le seul "engagement" : continuer à faire `tsc --noEmit` propre + 68/68 tests verts à chaque commit.
+
+---
+
+## Décisions PO récentes
+
+### 2026-05-24 — Triage initial sur 4 idées remontées par dogfooding
 
 | Idée | Décision |
 |---|---|
-| Fenêtre de contexte pour parler / approuver une action | Déjà au plan — Phase 2, Sprint 5-7 (PTY wrap + Réponses contextuelles). Pas de changement. |
-| Améliorer le pathfinding (blocage dans les murs) | Story S2.5 ajoutée. A* grid-based, ~2j, démarre Sprint 2. |
-| Comportement par statut → lieu (planning → tableau, coding → bureau) | Story S7.5 ajoutée. Liée à l'interactivité, démarre Sprint 7. |
-| Tâches planifiées (routines Claude Code) sur la map | Story S7.6 ajoutée. Panneau dans le jardin + modal. À investiguer le stockage des routines en début de story. |
+| Fenêtre de contexte pour parler / approuver une action | Implémentée — terminal overlay + approval widget (Sprint 5-7). |
+| Améliorer le pathfinding (blocage dans les murs) | Implémentée — S2.5 A* grid-based. |
+| Comportement par statut → lieu | Reporté → TA.4. |
+| Tâches planifiées sur la map | Reporté → TC.3. |
+
+### 2026-05-30 — Pivot mode terrain de jeu solo
+
+Après le bilan PM post-Sprint 8, on assume consciemment de ne pas lancer. Le projet sert au skill-building solo pour l'instant. La roadmap business (Phases 3-5 originales) est parquée dans [STRATEGY.md](STRATEGY.md), à ressortir le jour où on switch en mode "ship". Le backlog est réorganisé par thèmes au lieu de phases.

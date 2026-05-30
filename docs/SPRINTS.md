@@ -299,7 +299,35 @@ S6.4 (politique sessions externes / tmux) reporté — non bloquant tant que les
 ### Ce qu'on garde pour la suite
 
 - **Avant prochain feature work** : décider entre (1) ship & valider (S8.3 + S7.4 notarisation + tag v0.2.0), (2) finir Phase 2 (S7.5 POIs, S7.6 routines, chat panel free-text), ou (3) attaquer Phase 3 (cloud sync).
-- **Dette repérée** : `NpcManager.ts` (619 lignes) à splitter (PT.5), `docs/SPRINTS.md` rafraîchi maintenant, screenshots stats dashboard à capturer manuellement.
+- **Dette résolue depuis** : `NpcManager.ts` splitté (PT.5 livré `e578fa9`, 685 → 444 lignes, `CharacterSpriteFactory` extrait à 280 lignes — `ee2602e` coche dans BACKLOG, 68/68 tests verts).
+- **Reste à capturer** : screenshots stats dashboard à capturer manuellement.
+
+---
+
+## État après Sprint 8 — 2026-05-30
+
+**Phase 1** quasi close : il reste S4.3 (vidéo demo 90s), S4.5 (release publique), S7.4 (notarisation), PT.6 (ESLint). Aucun n'est bloquant pour dogfooding interne.
+
+**Phase 2** techniquement complète : PTY, terminal overlay, approval widgets, notifs, Professeur, RPG dialogues. Reste S7.5 (POIs par statut), S7.6 (routines panel), S6.4 (sessions externes) — du polish "workspace vivant", pas du chemin critique.
+
+**Tag local** : `v0.1.0` créé mais **pas** publié comme GitHub Release.
+
+### Décision d'orientation — 2026-05-30
+
+Après bilan PM, deux pistes étaient sur la table :
+1. **Mode launch** — pousser la release publique, récupérer du feedback réel.
+2. **Mode terrain de jeu solo** — continuer à construire pour le plaisir + skill-building, sans pression user.
+
+**Choix retenu : option 2.** Le projet reste à usage interne, le backlog est réorganisé par thèmes techniques (game dev, AI orchestration, workspace intel, perf, extensibility, multiplayer) — voir [BACKLOG.md](BACKLOG.md) refondu.
+
+Toute la stratégie produit / launch / kill list est parquée dans [STRATEGY.md](STRATEGY.md), prête à ressortir le jour où on switch en mode "ship" (critères de switch documentés dans le même fichier).
+
+### Ce que ça change concrètement
+
+- Plus de "Sprint N" planifiés à l'avance. On picks une story dans un thème, on la fait, on en picks une autre.
+- Tests verts + tsc clean restent les seuls engagements de qualité.
+- Les Phases 3-5 originales (auth, cloud, pricing, M&A) ne sont plus dans le backlog opérationnel — elles vivent dans STRATEGY.md comme parking lot.
+- Les stories S7.5 et S7.6 sont remises dans le pool, renommées TA.4 (POIs) et TC.3 (routines).
 
 ---
 
