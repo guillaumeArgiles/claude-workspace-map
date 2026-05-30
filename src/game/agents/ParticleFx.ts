@@ -64,6 +64,14 @@ export class ParticleFx {
       entry.smoke = undefined;
     }
 
+    // ─── transition → done : one-shot confettis ─────────────────────────────
+    // `done` côté watcher == turnEnded (stop_hook_summary sans tool_use plus
+    // récent). Le check `prev !== undefined` évite le burst au boot pour les
+    // agents déjà en `done` au moment du chargement.
+    if (status === "done" && prev !== undefined && prev !== "done") {
+      this.fireConfetti(npc);
+    }
+
     entry.prevStatus = status;
     this.emitters.set(npc, entry);
   }
@@ -102,6 +110,35 @@ export class ParticleFx {
     });
     emitter.setDepth(layerDepth.OVERLAYS + 10);
     return emitter;
+  }
+
+  /**
+   * One-shot burst de confettis sur task complete. Pas attaché au sprite
+   * (le NPC est de toute façon stationnaire en `done`) — la position est
+   * snapshotée au moment du fire. L'émetteur s'auto-détruit après que
+   * toutes les particules sont mortes pour éviter l'accumulation.
+   */
+  private fireConfetti(npc: NpcInstance): void {
+    const emitter = this.scene.add.particles(0, 0, ParticleFx.TEXTURE_KEY, {
+      // Palette saturée : rouge, orange, vert, cyan, violet, rose.
+      tint: [0xef4444, 0xf59e0b, 0x84cc16, 0x06b6d4, 0xa855f7, 0xec4899],
+      lifespan: 1300,
+      speed: { min: 80, max: 180 },
+      angle: { min: -180, max: 0 }, // hémisphère supérieur (vers le haut)
+      scale: { start: 1.3, end: 0 },
+      alpha: { start: 1, end: 0 },
+      gravityY: 220, // les confettis tombent
+      rotate: { start: 0, end: 360 }, // tumbling
+      emitting: false, // explode manuel ci-dessous
+    });
+    emitter.setDepth(layerDepth.OVERLAYS + 11);
+
+    const x = npc.sprite.x;
+    const y = npc.sprite.y - npc.sprite.displayHeight * 0.4;
+    emitter.explode(28, x, y);
+
+    // Cleanup une fois la dernière particule morte (+ marge).
+    this.scene.time.delayedCall(1600, () => emitter.destroy());
   }
 
   private makeSmokeEmitter(
