@@ -56,6 +56,14 @@ export class ParticleFx {
       entry.sparkle = undefined;
     }
 
+    // ─── blocked → smoke gris (continuous) ──────────────────────────────────
+    if (status === "blocked" && !entry.smoke) {
+      entry.smoke = this.makeSmokeEmitter(npc);
+    } else if (status !== "blocked" && entry.smoke) {
+      entry.smoke.destroy();
+      entry.smoke = undefined;
+    }
+
     entry.prevStatus = status;
     this.emitters.set(npc, entry);
   }
@@ -91,6 +99,34 @@ export class ParticleFx {
       frequency: 220,
       quantity: 1,
       blendMode: Phaser.BlendModes.ADD,
+    });
+    emitter.setDepth(layerDepth.OVERLAYS + 10);
+    return emitter;
+  }
+
+  private makeSmokeEmitter(
+    npc: NpcInstance
+  ): Phaser.GameObjects.Particles.ParticleEmitter {
+    const emitter = this.scene.add.particles(0, 0, ParticleFx.TEXTURE_KEY, {
+      // Smoke rises slowly from just above the head.
+      follow: npc.sprite,
+      followOffset: { x: 0, y: -npc.sprite.displayHeight * 0.35 },
+      // Gray palette, weighted dark→light so the column reads as smoke.
+      tint: [0x6b7280, 0x9ca3af, 0x4b5563],
+      lifespan: 1400,
+      speed: { min: 8, max: 20 },
+      angle: { min: -100, max: -80 }, // narrow upward cone
+      // Smoke EXPANDS as it rises (opposite of sparkles).
+      scale: { start: 0.8, end: 2.2 },
+      // Starts faint and fades — no harsh visual punch.
+      alpha: { start: 0.42, end: 0 },
+      frequency: 280,
+      quantity: 1,
+      // Light negative gravity to encourage the upward drift without making
+      // particles fly off-screen.
+      gravityY: -10,
+      // Normal blend so smoke looks dense, not glowy.
+      blendMode: Phaser.BlendModes.NORMAL,
     });
     emitter.setDepth(layerDepth.OVERLAYS + 10);
     return emitter;
