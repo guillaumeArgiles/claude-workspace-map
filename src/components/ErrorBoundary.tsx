@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { t } from "../i18n";
 
 interface Props {
   /** Where to send a label when reporting (just a console tag, free-form). */
@@ -37,8 +38,8 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         this.props.fallback?.(this.state.error, this.reset) ?? (
           <div className="error-boundary-default">
-            <p>Something went wrong.</p>
-            <button onClick={this.reset}>Try again</button>
+            <p>{t("errorboundary.something")}</p>
+            <button onClick={this.reset}>{t("errorboundary.try_again")}</button>
           </div>
         )
       );

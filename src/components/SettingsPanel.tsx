@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import type { AppConfig } from "../../shared/config-schema";
+import type { AppConfig, Locale } from "../../shared/config-schema";
+import { SUPPORTED_LOCALES } from "../../shared/config-schema";
+import { useTranslation } from "../i18n";
 
 interface SettingsPanelProps {
   config: AppConfig;
@@ -8,11 +10,17 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ config, onClose, onChange }: SettingsPanelProps) {
+  const { t, setLocale } = useTranslation();
   const [local, setLocal] = useState<AppConfig>(config);
   const [saving, setSaving] = useState(false);
 
-  // Live preview on every local change
-  useEffect(() => { onChange(local); }, [local]);
+  // Live preview on every local change. Locale is mirrored into the i18n
+  // module so the rest of the UI re-renders in the chosen language before
+  // the user has saved.
+  useEffect(() => {
+    onChange(local);
+    setLocale(local.locale);
+  }, [local]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     setSaving(true);
@@ -25,6 +33,7 @@ export function SettingsPanel({ config, onClose, onChange }: SettingsPanelProps)
       if (!res.ok) throw new Error(await res.text());
       const saved = (await res.json()) as AppConfig;
       onChange(saved);
+      setLocale(saved.locale);
       onClose();
     } catch (err) {
       console.error("Failed to save config:", err);
@@ -35,6 +44,7 @@ export function SettingsPanel({ config, onClose, onChange }: SettingsPanelProps)
 
   function handleCancel() {
     onChange(config); // revert live preview to original
+    setLocale(config.locale);
     onClose();
   }
 
@@ -46,27 +56,40 @@ export function SettingsPanel({ config, onClose, onChange }: SettingsPanelProps)
     <div id="settings-panel-backdrop" onClick={handleBackdrop}>
       <div id="settings-panel">
         <header>
-          <h3>Settings</h3>
+          <h3>{t("settings.title")}</h3>
           <button className="close-btn" onClick={onClose}>✕</button>
         </header>
 
-        <span className="settings-label">Theme</span>
+        <span className="settings-label">{t("settings.theme")}</span>
         <div className="settings-toggle">
           <button
             className={local.theme === "dark" ? "active" : ""}
             onClick={() => setLocal((p) => ({ ...p, theme: "dark" }))}
           >
-            Dark
+            {t("settings.theme.dark")}
           </button>
           <button
             className={local.theme === "light" ? "active" : ""}
             onClick={() => setLocal((p) => ({ ...p, theme: "light" }))}
           >
-            Light
+            {t("settings.theme.light")}
           </button>
         </div>
 
-        <span className="settings-label">Sidebar width</span>
+        <span className="settings-label">{t("settings.language")}</span>
+        <div className="settings-toggle">
+          {SUPPORTED_LOCALES.map((loc) => (
+            <button
+              key={loc}
+              className={local.locale === loc ? "active" : ""}
+              onClick={() => setLocal((p) => ({ ...p, locale: loc as Locale }))}
+            >
+              {t(`settings.language.${loc}`)}
+            </button>
+          ))}
+        </div>
+
+        <span className="settings-label">{t("settings.sidebar_width")}</span>
         <div className="settings-slider-row">
           <input
             type="range"
@@ -80,18 +103,18 @@ export function SettingsPanel({ config, onClose, onChange }: SettingsPanelProps)
           <span className="settings-slider-val">{local.sidebarWidth}px</span>
         </div>
 
-        <span className="settings-label">Server port</span>
+        <span className="settings-label">{t("settings.server_port")}</span>
         <div>
           <span className="settings-port">{config.port}</span>
-          <span className="settings-note">restart required to change</span>
+          <span className="settings-note">{t("settings.note.restart")}</span>
         </div>
 
         <div className="settings-actions">
           <button className="cancel-btn" onClick={handleCancel}>
-            Cancel
+            {t("settings.cancel")}
           </button>
           <button className="spawn-btn" onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("settings.saving") : t("settings.save")}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import type { AgentState, SubAgentState } from "../../../shared/agent-types";
+import { t } from "../../i18n";
 
 /**
  * A "house" is a slot on the map that a Claude project (cwd) can claim.
@@ -100,20 +101,22 @@ export function statusDialogue(agent: AgentState | SubAgentState): string {
   const tool = agent.currentTool ? ` (${agent.currentTool})` : "";
   switch (agent.status) {
     case "planning":
-      return "Construit le plan.";
+      return t("dialogue.status.planning");
     case "awaiting_approval":
-      return "Plan prêt — j'attends ta validation.";
+      return t("dialogue.status.awaiting_approval");
     case "coding":
-      return `Modifie les fichiers${tool}.`;
+      return t("dialogue.status.coding", { tool });
     case "running_tool":
-      return `Exécute ${agent.currentTool || "un outil"}.`;
+      return t("dialogue.status.running_tool", {
+        tool: agent.currentTool || t("dialogue.status.running_tool_fallback"),
+      });
     case "idle":
-      return "Au repos.";
+      return t("dialogue.status.idle");
     case "done":
-      return "Tour terminé.";
+      return t("dialogue.status.done");
     case "blocked":
-      return "Bloqué — besoin d'aide.";
+      return t("dialogue.status.blocked");
     default:
-      return "—";
+      return t("dialogue.status.default");
   }
 }

@@ -18,6 +18,7 @@ import { NavGrid } from "../world/NavGrid";
 import { RPGApprovalUI } from "../ui/RPGApprovalUI";
 import { RPGAgentMenuUI } from "../ui/RPGAgentMenuUI";
 import { DragDropController } from "../services/DragDropController";
+import { t, subscribeLocale } from "../../i18n";
 
 const BACKGROUND_KEY = "workspace-background";
 
@@ -165,7 +166,7 @@ export class MapScene extends Phaser.Scene {
 
     // HUD: top-left status line showing connection / agent count.
     this.statusText = this.add
-      .text(8, 8, "Connecting to /api/events…", {
+      .text(8, 8, t("scene.connecting"), {
         fontSize: "12px",
         color: "#ffffff",
         backgroundColor: "#000000aa",
@@ -178,15 +179,31 @@ export class MapScene extends Phaser.Scene {
     // interacting with him (E key) spawns his dedicated Claude Code session.
     this.professorNpc = this.npcManager.spawn({
       id: "professor",
-      name: "Le Professeur",
+      name: t("scene.professor.name"),
       x: GRID.width / 2,
       y: GRID.height - 250,
-      dialogue: "Comment puis-je t'aider ?",
-      interactLabel: "parler au Professeur",
+      dialogue: t("scene.professor.dialogue"),
+      interactLabel: t("scene.professor.interact"),
       sprite: "profesor",
       static: true,
       showBadge: false,
     });
+
+    // Locale change → refresh Professor's static labels (other NPCs refresh
+    // automatically because their dialogue is recomputed via statusDialogue()
+    // on every AgentSyncer tick).
+    const unsubLocale = subscribeLocale(() => {
+      if (this.professorNpc) {
+        this.professorNpc.def.name = t("scene.professor.name");
+        this.professorNpc.def.dialogue = t("scene.professor.dialogue");
+        this.professorNpc.def.interactLabel = t("scene.professor.interact");
+        if (this.dialogue.openNpc === this.professorNpc) {
+          this.dialogue.refresh(this.professorNpc);
+        }
+      }
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, unsubLocale);
+    this.events.once(Phaser.Scenes.Events.DESTROY, unsubLocale);
 
     // Floating 💬 glyph above the Professor — appears + bobs when all agents
     // are calm, inviting the player to come chat. Positioned dynamically each

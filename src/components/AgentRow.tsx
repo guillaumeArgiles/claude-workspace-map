@@ -7,7 +7,8 @@ import {
   studentSpriteFor,
   teacherSpriteFor,
 } from "../../shared/agent-sprites";
-import { STATUS_COLOR, STATUS_LABEL } from "../../shared/agent-ui";
+import { STATUS_COLOR } from "../../shared/agent-ui";
+import { useTranslation } from "../i18n";
 
 export interface ActivePty {
   ptyId: string;
@@ -43,13 +44,14 @@ export function AgentRow({
   onClick: () => void;
   onDismiss: () => void;
 }) {
+  const { t } = useTranslation();
   const liveSubs = agent.subAgents.filter((s) => !s.finished);
 
   let termTitle: string;
-  if (resuming)            termTitle = "Opening Claude Code…";
-  else if (pty?.minimized) termTitle = "Restore terminal";
-  else if (pty)            termTitle = "Terminal open — click to bring up";
-  else                     termTitle = `Open in Claude Code (${agent.sessionId.slice(0, 8)}…)`;
+  if (resuming)            termTitle = t("agent.row.opening");
+  else if (pty?.minimized) termTitle = t("agent.row.restore");
+  else if (pty)            termTitle = t("agent.row.terminal_open");
+  else                     termTitle = t("agent.row.open_in_cc", { sessionShort: agent.sessionId.slice(0, 8) });
 
   const hasPending = agent.pendingPlan !== undefined ||
     (agent.pendingQuestions && agent.pendingQuestions.length > 0);
@@ -72,7 +74,7 @@ export function AgentRow({
               className={`status-dot${agent.status === "awaiting_approval" || agent.status === "blocked" ? " status-dot-pulse" : ""}`}
               style={{ background: STATUS_COLOR[agent.status] }}
             />
-            <span className="status">{STATUS_LABEL[agent.status]}</span>
+            <span className="status">{t(`status.${agent.status}`)}</span>
             {agent.currentTool ? <span className="tool"> · {agent.currentTool}</span> : null}
           </div>
           {agent.currentToolDetail ? (
@@ -80,11 +82,11 @@ export function AgentRow({
           ) : null}
         </div>
         {resuming ? (
-          <span className="terminal-badge resuming-badge" title="Launching…">···</span>
+          <span className="terminal-badge resuming-badge" title={t("agent.row.launching")}>···</span>
         ) : pty ? (
           <span
             className={`terminal-badge ${pty.minimized ? "minimized" : "active"}`}
-            title={pty.minimized ? "Terminal minimized — click to restore" : "Terminal open"}
+            title={pty.minimized ? t("agent.row.terminal_minimized") : t("agent.row.terminal_open_title")}
           >
             &gt;_
           </span>
@@ -93,7 +95,7 @@ export function AgentRow({
         )}
         <button
           className="dismiss-btn"
-          title="Dismiss agent"
+          title={t("agent.row.dismiss")}
           onClick={(e) => { e.stopPropagation(); onDismiss(); }}
         >
           ×
@@ -139,8 +141,9 @@ function PendingApprovalWidget({
 }
 
 function PlanWidget({ plan, canInteract, onOpen }: { plan: string; canInteract: boolean; onOpen: () => void }) {
+  const { t } = useTranslation();
   const lines = plan.split("\n").filter((l) => l.trim());
-  const title = (lines[0] ?? "Plan").replace(/^#+\s*/, "");
+  const title = (lines[0] ?? t("agent.approval.plan_fallback_title")).replace(/^#+\s*/, "");
   const bodyLines = lines.slice(1).filter((l) => !l.startsWith("#")).slice(0, 3);
   const preview = bodyLines.join(" ").slice(0, 140);
 
@@ -154,11 +157,11 @@ function PlanWidget({ plan, canInteract, onOpen }: { plan: string; canInteract: 
       <div className="approval-actions">
         {canInteract ? (
           <button className="approval-btn" onClick={onOpen}>
-            Répondre dans le terminal
+            {t("agent.approval.respond")}
           </button>
         ) : (
           <span className="approval-external-hint">
-            ↗ Réponds dans ton terminal Claude Code
+            {t("agent.approval.external_hint")}
           </span>
         )}
       </div>
@@ -175,6 +178,7 @@ function QuestionsWidget({
   canInteract: boolean;
   onOpen: () => void;
 }) {
+  const { t, plural } = useTranslation();
   const q = questions[0];
   return (
     <div className="approval-widget">
@@ -194,16 +198,16 @@ function QuestionsWidget({
         ))}
       </ul>
       {questions.length > 1 && (
-        <p className="approval-more">+{questions.length - 1} more question{questions.length > 2 ? "s" : ""}</p>
+        <p className="approval-more">{plural(questions.length - 1, "agent.row.more_questions")}</p>
       )}
       <div className="approval-actions">
         {canInteract ? (
           <button className="approval-btn" onClick={onOpen}>
-            Répondre dans le terminal
+            {t("agent.approval.respond")}
           </button>
         ) : (
           <span className="approval-external-hint">
-            ↗ Réponds dans ton terminal Claude Code
+            {t("agent.approval.external_hint")}
           </span>
         )}
       </div>
@@ -213,6 +217,7 @@ function QuestionsWidget({
 
 // ── SubAgentRow ─────────────────────────────────────────────────────────────
 export function SubAgentRow({ sub }: { sub: SubAgentState }) {
+  const { t } = useTranslation();
   return (
     <li className="sub-agent" tabIndex={0}>
       <span
@@ -229,10 +234,10 @@ export function SubAgentRow({ sub }: { sub: SubAgentState }) {
         }}
       />
       <div className="meta">
-        <div className="name" title={sub.description}>{sub.description || "Sub-task"}</div>
+        <div className="name" title={sub.description}>{sub.description || t("agent.row.sub_task")}</div>
         <div className="line">
           <span className="status-dot" style={{ background: STATUS_COLOR[sub.status] }} />
-          <span className="status">{STATUS_LABEL[sub.status]}</span>
+          <span className="status">{t(`status.${sub.status}`)}</span>
           {sub.currentTool ? <span className="tool"> · {sub.currentTool}</span> : null}
         </div>
         {sub.currentToolDetail ? (

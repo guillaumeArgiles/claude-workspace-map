@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslation } from "../i18n";
 
 /** Measure a container's pixel size live. Sidesteps a recharts v3 issue where
  *  ResponsiveContainer renders to 0×0 inside CSS grid items. */
@@ -72,13 +73,6 @@ function shortName(cwd: string): string {
   return cwd.split("/").filter(Boolean).pop() ?? cwd;
 }
 
-function compactNumber(n: number): string {
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + "B";
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "k";
-  return String(n);
-}
-
 function rangeToMs(r: Range): { from?: number; to: number } {
   const to = Date.now();
   if (r === "7d") return { from: to - 7 * 24 * 60 * 60 * 1000, to };
@@ -89,6 +83,7 @@ function rangeToMs(r: Range): { from?: number; to: number } {
 }
 
 export function StatsDashboard({ onClose }: StatsDashboardProps) {
+  const { t, locale, plural, formatCompact } = useTranslation();
   const [range, setRange] = useState<Range>("30d");
   const [projectCwd, setProjectCwd] = useState<string>("");
   const [data, setData] = useState<StatsResponse | null>(null);
@@ -161,7 +156,7 @@ export function StatsDashboard({ onClose }: StatsDashboardProps) {
     <div id="stats-dashboard-backdrop" onClick={handleBackdrop}>
       <div id="stats-dashboard">
         <header>
-          <h3>Workspace insights</h3>
+          <h3>{t("stats.title")}</h3>
           <div className="stats-controls">
             <div className="stats-range">
               {(["7d", "30d", "all"] as Range[]).map((r) => (
@@ -170,7 +165,7 @@ export function StatsDashboard({ onClose }: StatsDashboardProps) {
                   className={`range-btn ${range === r ? "active" : ""}`}
                   onClick={() => setRange(r)}
                 >
-                  {r === "7d" ? "7 days" : r === "30d" ? "30 days" : "All time"}
+                  {t(`stats.range.${r}`)}
                 </button>
               ))}
             </div>
@@ -179,50 +174,56 @@ export function StatsDashboard({ onClose }: StatsDashboardProps) {
               value={projectCwd}
               onChange={(e) => setProjectCwd(e.target.value)}
             >
-              <option value="">All projects</option>
+              <option value="">{t("stats.all_projects")}</option>
               {data?.projects.map((p) => (
                 <option key={p} value={p}>{shortName(p)}</option>
               ))}
             </select>
-            <button className="stats-close-btn" onClick={onClose} aria-label="Close">✕</button>
+            <button className="stats-close-btn" onClick={onClose} aria-label={t("stats.close")}>✕</button>
           </div>
         </header>
 
-        {error && <div className="stats-error">Failed to load: {error}</div>}
+        {error && <div className="stats-error">{t("stats.error", { error })}</div>}
 
         <div className="kpi-grid">
           <div className="kpi-card">
-            <div className="label">Sessions</div>
-            <div className="value">{data ? compactNumber(data.totals.sessions) : "—"}</div>
+            <div className="label">{t("stats.kpi.sessions")}</div>
+            <div className="value">{data ? formatCompact(data.totals.sessions) : "—"}</div>
           </div>
           <div className="kpi-card">
-            <div className="label">Tokens (in + out + cache)</div>
-            <div className="value">{data ? compactNumber(totalTokens) : "—"}</div>
+            <div className="label">{t("stats.kpi.tokens")}</div>
+            <div className="value">{data ? formatCompact(totalTokens) : "—"}</div>
             {data && (
               <div className="kpi-sub">
-                {compactNumber(data.totals.inputTokens)} in · {compactNumber(data.totals.outputTokens)} out
+                {t("stats.kpi.tokens.sub", {
+                  in: formatCompact(data.totals.inputTokens),
+                  out: formatCompact(data.totals.outputTokens),
+                })}
               </div>
             )}
           </div>
           <div className="kpi-card">
-            <div className="label">Tool calls</div>
-            <div className="value">{data ? compactNumber(data.totals.toolCalls) : "—"}</div>
+            <div className="label">{t("stats.kpi.toolcalls")}</div>
+            <div className="value">{data ? formatCompact(data.totals.toolCalls) : "—"}</div>
           </div>
           <div className="kpi-card">
-            <div className="label">Plans accepted</div>
+            <div className="label">{t("stats.kpi.plans")}</div>
             <div className="value">
               {data ? (acceptRate === null ? "—" : `${acceptRate}%`) : "—"}
             </div>
             {data && data.totals.plansProposed > 0 && (
               <div className="kpi-sub">
-                {data.totals.plansAccepted} / {data.totals.plansProposed} proposed
+                {t("stats.kpi.plans.sub", {
+                  accepted: data.totals.plansAccepted,
+                  proposed: data.totals.plansProposed,
+                })}
               </div>
             )}
           </div>
         </div>
 
         <div className="chart-card stats-chart-wide">
-          <div className="chart-title">Sessions per day</div>
+          <div className="chart-title">{t("stats.chart.per_day")}</div>
           <div className="chart-body" ref={lineRef}>
             {lineSize.width > 0 && (
               <LineChart width={lineSize.width} height={lineSize.height} data={data?.sessionsPerDay ?? []} margin={{ top: 8, right: 16, bottom: 4, left: -16 }}>
@@ -241,7 +242,7 @@ export function StatsDashboard({ onClose }: StatsDashboardProps) {
 
         <div className="chart-row">
           <div className="chart-card">
-            <div className="chart-title">Top tools</div>
+            <div className="chart-title">{t("stats.chart.top_tools")}</div>
             <div className="chart-body" ref={barRef}>
               {barSize.width > 0 && (
                 <BarChart width={barSize.width} height={barSize.height} data={topToolsForChart} margin={{ top: 8, right: 16, bottom: 4, left: -16 }}>
@@ -259,7 +260,7 @@ export function StatsDashboard({ onClose }: StatsDashboardProps) {
           </div>
 
           <div className="chart-card">
-            <div className="chart-title">Top projects (by sessions)</div>
+            <div className="chart-title">{t("stats.chart.top_projects")}</div>
             <div className="chart-body" ref={pieRef}>
               {pieSize.width > 0 && (
                 <PieChart width={pieSize.width} height={pieSize.height}>
@@ -280,9 +281,14 @@ export function StatsDashboard({ onClose }: StatsDashboardProps) {
         <footer className="stats-footer">
           <span className="stats-range-text">
             {data
-              ? `${new Date(data.range.from).toLocaleDateString()} → ${new Date(data.range.to).toLocaleDateString()} · ${data.totals.sessions} sessions across ${data.projects.length} project${data.projects.length === 1 ? "" : "s"}`
+              ? t("stats.footer.summary", {
+                  from: new Date(data.range.from).toLocaleDateString(locale),
+                  to: new Date(data.range.to).toLocaleDateString(locale),
+                  sessions: plural(data.totals.sessions, "stats.plural.sessions"),
+                  projects: plural(data.projects.length, "stats.plural.projects"),
+                })
               : loading
-                ? "Loading…"
+                ? t("stats.loading")
                 : ""}
           </span>
         </footer>

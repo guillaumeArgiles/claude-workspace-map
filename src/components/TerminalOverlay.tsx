@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+import { useTranslation } from "../i18n";
 
 interface TerminalOverlayProps {
   ptyId: string;
@@ -23,6 +24,7 @@ function isCrashOutput(chunk: string): boolean {
 }
 
 export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize, onRespawn }: TerminalOverlayProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -168,11 +170,11 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize, onRespawn }: 
       <div id="terminal-panel">
         <header id="terminal-header">
           <span className="term-title" title={cwd}>{shortName(cwd)}</span>
-          <span className={`dot ${connected && !sessionEnded ? "ok" : "ko"}`} title={connected ? "connected" : "disconnected"} />
+          <span className={`dot ${connected && !sessionEnded ? "ok" : "ko"}`} title={connected ? t("terminal.title.connected") : t("terminal.title.disconnected")} />
           <span className="term-pty-id">{ptyId.slice(0, 8)}</span>
           <div className="term-controls">
-            <button className="term-btn minimize-btn" onClick={onMinimize} title="Minimize — attach to agent">—</button>
-            <button className="term-btn close-btn" onClick={onClose} title="Close terminal">✕</button>
+            <button className="term-btn minimize-btn" onClick={onMinimize} title={t("terminal.minimize")}>—</button>
+            <button className="term-btn close-btn" onClick={onClose} title={t("terminal.close")}>✕</button>
           </div>
         </header>
 
@@ -182,11 +184,11 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize, onRespawn }: 
         {sessionEnded && crashed && onRespawn && (
           <div id="terminal-crash-bar">
             <span className="crash-msg">
-              ⚠ Claude Code crashed loading session history
-              <span className="crash-detail"> (bug v2.1.x — originalFile null on resume)</span>
+              {t("terminal.crashed")}
+              <span className="crash-detail">{t("terminal.crashed_detail")}</span>
             </span>
             <button className="crash-respawn-btn" onClick={handleRespawn}>
-              ⚡ Open fresh session
+              {t("terminal.open_fresh")}
             </button>
           </div>
         )}
@@ -194,10 +196,10 @@ export function TerminalOverlay({ ptyId, cwd, onClose, onMinimize, onRespawn }: 
         {/* Ended but NOT crashed — normal exit */}
         {sessionEnded && !crashed && (
           <div id="terminal-ended-bar">
-            <span>Session ended</span>
+            <span>{t("terminal.session_ended")}</span>
             {onRespawn && (
               <button className="crash-respawn-btn" onClick={handleRespawn}>
-                ⚡ New session
+                {t("terminal.new_session")}
               </button>
             )}
           </div>

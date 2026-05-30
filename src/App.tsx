@@ -6,6 +6,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { StatsDashboard } from "./components/StatsDashboard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { CmdKHint } from "./components/CmdKHint";
+import { I18nProvider, detectLocale, setLocale, useTranslation } from "./i18n";
 import type { AppConfig } from "../shared/config-schema";
 
 function applyTheme(cfg: AppConfig) {
@@ -24,12 +25,24 @@ function applyTheme(cfg: AppConfig) {
 }
 
 export function App() {
+  // The locale is owned by I18nProvider; AppShell uses it via useTranslation.
+  // We render the provider with a navigator-detected locale immediately, then
+  // align it with the persisted config locale once /api/config returns.
+  return (
+    <I18nProvider initialLocale={detectLocale()}>
+      <AppShell />
+    </I18nProvider>
+  );
+}
+
+function AppShell() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!mountRef.current || gameRef.current) return;
@@ -80,13 +93,14 @@ export function App() {
     };
   }, []);
 
-  // Fetch config on mount and apply theme
+  // Fetch config on mount and apply theme + locale
   useEffect(() => {
     fetch("/api/config")
       .then((r) => r.json())
       .then((cfg: AppConfig) => {
         setConfig(cfg);
         applyTheme(cfg);
+        setLocale(cfg.locale);
       })
       .catch(() => {});
   }, []);
@@ -103,12 +117,12 @@ export function App() {
             <aside id="agent-sidebar" className="errored">
               <header>
                 <span className="dot ko" />
-                <h2>Live Claude sessions</h2>
+                <h2>{t("sidebar.title")}</h2>
               </header>
               <div className="boundary-fallback">
-                <p>The sidebar crashed.</p>
+                <p>{t("sidebar.fallback.title")}</p>
                 <code>{err.message}</code>
-                <button onClick={reset}>Retry</button>
+                <button onClick={reset}>{t("sidebar.fallback.retry")}</button>
               </div>
             </aside>
           )}

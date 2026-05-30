@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { layerDepth } from "../config/grid";
 import { uiBus } from "../services/uiBus";
+import { t } from "../../i18n";
 import type { NpcInstance } from "../agents/types";
 import type { NpcManager } from "../agents/NpcManager";
 
@@ -202,8 +203,8 @@ export class RPGAgentMenuUI {
     return [
       {
         key: "1",
-        label: "Voir la conversation",
-        description: "Ouvre le terminal de l'agent",
+        label: t("agent_menu.see_conversation"),
+        description: t("agent_menu.see_conversation.desc"),
         run: () => {
           uiBus.emit("open_terminal", { sessionId });
           this.close();
@@ -211,8 +212,8 @@ export class RPGAgentMenuUI {
       },
       {
         key: "2",
-        label: "Voir le plan",
-        description: "Affiche le plan en attente",
+        label: t("agent_menu.see_plan"),
+        description: t("agent_menu.see_plan.desc"),
         hidden: !hasPlan,
         run: () => {
           this.view = "plan";
@@ -221,12 +222,12 @@ export class RPGAgentMenuUI {
       },
       {
         key: hasPlan ? "3" : "2",
-        label: "Poser une question",
+        label: t("agent_menu.ask"),
         description: hasPty
-          ? "Ouvre le terminal avec /btw"
+          ? t("agent_menu.ask.btw")
           : loadingPty
-            ? "Connexion au terminal…"
-            : "Terminal non lié — clique 'Voir la conversation' d'abord",
+            ? t("agent_menu.ask.connecting")
+            : t("agent_menu.ask.no_pty"),
         disabled: !hasPty,
         run: () => {
           void this.writeToPty("/btw ");
@@ -236,12 +237,12 @@ export class RPGAgentMenuUI {
       },
       {
         key: hasPlan ? "4" : "3",
-        label: "Travailler plus vite 🔥",
+        label: t("agent_menu.work_faster"),
         description: hasPty
-          ? "Coup de fouet + /fast"
+          ? t("agent_menu.work_faster.fast")
           : loadingPty
-            ? "Connexion au terminal…"
-            : "Terminal non lié",
+            ? t("agent_menu.ask.connecting")
+            : t("agent_menu.work_faster.no_pty"),
         disabled: !hasPty,
         run: () => {
           const npcRef = this.openFor;
@@ -254,8 +255,8 @@ export class RPGAgentMenuUI {
       },
       {
         key: hasPlan ? "5" : "4",
-        label: "Tuer l'agent 💀",
-        description: "Termine le process Claude Code",
+        label: t("agent_menu.kill"),
+        description: t("agent_menu.kill.desc"),
         run: () => {
           const npcRef = this.openFor;
           this.close();

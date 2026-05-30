@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "../i18n";
 
 interface SpawnedSession {
   ptyId: string;
@@ -15,6 +16,7 @@ interface SpawnPanelProps {
 }
 
 export function SpawnPanel({ recentCwds, defaultCwd, onClose, onSpawned }: SpawnPanelProps) {
+  const { t } = useTranslation();
   const [cwd, setCwd] = useState(defaultCwd ?? recentCwds[0] ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,24 +46,24 @@ export function SpawnPanel({ recentCwds, defaultCwd, onClose, onSpawned }: Spawn
     <div id="spawn-panel-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div id="spawn-panel">
         <header>
-          <h3>New Claude session</h3>
+          <h3>{t("spawn.title")}</h3>
           <button className="close-btn" onClick={onClose}>✕</button>
         </header>
 
-        <label>Working directory</label>
+        <label>{t("spawn.cwd")}</label>
         <input
           type="text"
           value={cwd}
           onChange={(e) => setCwd(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSpawn()}
-          placeholder="/path/to/project"
+          placeholder={t("spawn.placeholder")}
           autoFocus
           spellCheck={false}
         />
 
         {recentCwds.length > 0 && (
           <div className="recent-list">
-            <span className="recent-label">Recent</span>
+            <span className="recent-label">{t("spawn.recent")}</span>
             {recentCwds.slice(0, 5).map((d) => (
               <button
                 key={d}
@@ -78,13 +80,13 @@ export function SpawnPanel({ recentCwds, defaultCwd, onClose, onSpawned }: Spawn
         {error && <p className="spawn-error">{error}</p>}
 
         <div className="spawn-actions">
-          <button className="cancel-btn" onClick={onClose}>Cancel</button>
+          <button className="cancel-btn" onClick={onClose}>{t("spawn.cancel")}</button>
           <button
             className="spawn-btn"
             onClick={handleSpawn}
             disabled={!cwd.trim() || loading}
           >
-            {loading ? "Launching…" : "⚡ Launch Claude"}
+            {loading ? t("spawn.launching") : t("spawn.launch")}
           </button>
         </div>
       </div>

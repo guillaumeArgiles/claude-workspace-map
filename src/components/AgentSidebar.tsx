@@ -5,6 +5,7 @@ import type {
 } from "../../shared/agent-types";
 import { statusOrder } from "../../shared/agent-ui";
 import { uiBus } from "../game/services/uiBus";
+import { useTranslation, t as translate } from "../i18n";
 import { SpawnPanel } from "./SpawnPanel";
 import { TerminalOverlay } from "./TerminalOverlay";
 import { CommandPalette, type CommandItem } from "./CommandPalette";
@@ -34,6 +35,7 @@ interface AgentSidebarProps {
 
 // ── Component ───────────────────────────────────────────────────────────────
 export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats }: AgentSidebarProps) {
+  const { t, plural } = useTranslation();
   const [agents, setAgents] = useState<AgentState[]>([]);
   const [connected, setConnected] = useState(false);
   const [ptySessions, setPtySessions] = useState<ActivePty[]>([]);
@@ -225,7 +227,7 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
   async function requestNotifPermission() {
     if (!("Notification" in window)) return;
     if (Notification.permission === "denied") {
-      alert("Notifications bloquées par le navigateur.\nRéactive-les dans Préférences > Notifications.");
+      alert(t("notif.blocked.alert"));
       return;
     }
     const perm = await Notification.requestPermission();
@@ -237,10 +239,10 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     const isBlocked = agent.status === "blocked";
     const title = isBlocked
-      ? `🚫 ${agent.projectName} est bloqué`
-      : `✋ ${agent.projectName} attend ta réponse`;
+      ? t("notif.title.blocked", { project: agent.projectName })
+      : t("notif.title.awaiting", { project: agent.projectName });
     const body = agent.currentToolDetail
-      ?? (isBlocked ? "Besoin d'aide" : "En attente de validation");
+      ?? (isBlocked ? t("notif.body.blocked") : t("notif.body.awaiting"));
     // `tag` deduplicates: a second notification for the same session replaces
     // the first instead of stacking.
     const n = new Notification(title, { body, tag: agent.sessionId });
@@ -310,7 +312,7 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
     // surfaces. Default action = open terminal.
     for (const g of groups) {
       const projectName = shortName(g.cwd);
-      const groupLabel = `Project — ${projectName}`;
+      const groupLabel = t("palette.group.project", { name: projectName });
       for (const a of g.agents) {
         const pty = ptySessions.find((p) => p.cwd === a.cwd);
         out.push({
@@ -327,52 +329,53 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
     }
     // Actions — global commands. Shortcuts visible in `hint` mirror the keys
     // bound on `window` so the palette is also a keyboard cheat-sheet.
+    const actionGroup = t("palette.group.actions");
     out.push({
       id: "action:new-session",
-      label: "New Claude session…",
+      label: t("action.new_session"),
       hint: "N",
-      group: "Actions",
+      group: actionGroup,
       icon: "⚡",
       onSelect: () => { setSpawnDefaultCwd(""); setShowSpawnPanel(true); },
     });
     out.push({
       id: "action:professor",
-      label: "Spawn Professor",
+      label: t("action.spawn_professor"),
       hint: "P",
-      group: "Actions",
+      group: actionGroup,
       icon: "🎓",
       onSelect: () => void spawnProfessor(),
     });
     out.push({
       id: "action:toggle-sidebar",
-      label: collapsed ? "Show sidebar list" : "Hide sidebar list",
+      label: collapsed ? t("action.show_sidebar") : t("action.hide_sidebar"),
       hint: "S",
-      group: "Actions",
+      group: actionGroup,
       icon: "▤",
       onSelect: () => onToggle(),
     });
     out.push({
       id: "action:settings",
-      label: "Open Settings",
+      label: t("action.open_settings"),
       hint: ",",
-      group: "Actions",
+      group: actionGroup,
       icon: "⚙",
       onSelect: () => onOpenSettings(),
     });
     out.push({
       id: "action:stats",
-      label: "View workspace stats",
+      label: t("action.open_stats"),
       hint: "D",
-      group: "Actions",
+      group: actionGroup,
       icon: "📊",
       onSelect: () => onOpenStats(),
     });
     if (typeof Notification !== "undefined" && notifPermission !== "granted") {
       out.push({
         id: "action:enable-notif",
-        label: "Enable desktop notifications",
+        label: t("action.enable_notifications"),
         hint: "B",
-        group: "Actions",
+        group: actionGroup,
         icon: "🔔",
         onSelect: () => void requestNotifPermission(),
       });
@@ -380,16 +383,16 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
     if (inactiveCount > 0) {
       out.push({
         id: "action:clear-inactive",
-        label: `Clear ${inactiveCount} inactive agent${inactiveCount > 1 ? "s" : ""}`,
+        label: plural(inactiveCount, "action.clear_inactive"),
         hint: "⌫",
-        group: "Actions",
+        group: actionGroup,
         icon: "🧹",
         onSelect: () => dismissAllInactive(),
       });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups, inactiveCount, collapsed, notifPermission]);
+  }, [groups, inactiveCount, collapsed, notifPermission, t, plural]);
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   /** Index into the flat agent list for Tab cycling. */
@@ -442,11 +445,11 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
       if (showCmdPaletteRef.current) return;
 
       // Never fire while the user is typing in a form field or the spawn panel.
-      const t = e.target as HTMLElement;
+      const target = e.target as HTMLElement;
       if (
-        t.tagName === "INPUT" ||
-        t.tagName === "TEXTAREA" ||
-        t.isContentEditable
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
       ) return;
 
       const { groups, ptySessions, inactiveCount } = kbRef.current;
@@ -486,7 +489,9 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
             e.preventDefault();
             if (Notification.permission === "denied") {
               // Browser blocked — user must re-enable in browser settings.
-              alert("Notifications bloquées par le navigateur.\nRéactive-les dans Préférences > Notifications.");
+              // Module-level translate() reads currentLocale fresh; the stable
+              // handler must not close over the hook's locale-bound `t`.
+              alert(translate("notif.blocked.alert"));
             } else {
               void Notification.requestPermission().then((p) => setNotifPermission(p));
             }
@@ -572,21 +577,21 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
       <aside id="agent-sidebar">
         <header>
           <span className={`dot ${connected ? "ok" : "ko"}`} />
-          <h2>Online</h2>
+          <h2>{t("sidebar.online")}</h2>
           <span className="count">
-            {totalAgents}{totalSubs > 0 ? ` · ${totalSubs} sub` : ""}
+            {totalAgents}{totalSubs > 0 ? t("sidebar.count.sub", { n: totalSubs }) : ""}
           </span>
           <button
             className="spawn-btn-header"
             onClick={() => { setSpawnDefaultCwd(""); setShowSpawnPanel(true); }}
-            title="Launch a new Claude session"
+            title={t("sidebar.button.spawn.title")}
           >
             ⚡
           </button>
           <button
             className="professor-btn-header"
             onClick={() => void spawnProfessor()}
-            title="Invoquer le Professeur"
+            title={t("sidebar.button.professor.title")}
           >
             🎓
           </button>
@@ -594,7 +599,7 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
             <button
               className="clear-btn-header"
               onClick={dismissAllInactive}
-              title={`Clear ${inactiveCount} done/idle agent${inactiveCount > 1 ? "s" : ""}`}
+              title={plural(inactiveCount, "sidebar.button.clear.title")}
             >
               🧹
             </button>
@@ -605,10 +610,10 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
               onClick={notifPermission !== "granted" ? requestNotifPermission : undefined}
               title={
                 notifPermission === "granted"
-                  ? "Notifications activées"
+                  ? t("sidebar.button.notif.granted.title")
                   : notifPermission === "denied"
-                  ? "Notifications bloquées — réactiver dans les préférences du navigateur"
-                  : "Activer les notifications desktop"
+                  ? t("sidebar.button.notif.denied.title")
+                  : t("sidebar.button.notif.default.title")
               }
             >
               🔔
@@ -617,19 +622,19 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
           <button
             className="settings-btn-header"
             onClick={onOpenSettings}
-            title="Settings"
+            title={t("sidebar.button.settings.title")}
           >
             ⚙
           </button>
-          <button className="collapse-btn" onClick={onToggle} title="Collapse">→</button>
+          <button className="collapse-btn" onClick={onToggle} title={t("sidebar.button.collapse.title")}>→</button>
         </header>
 
         <div className="groups">
           {groups.length === 0 ? (
             <div className="empty">
-              <span>No active session.</span>
+              <span>{t("sidebar.empty.message")}</span>
               <button className="empty-spawn-btn" onClick={() => { setSpawnDefaultCwd(""); setShowSpawnPanel(true); }}>
-                ⚡ Launch Claude
+                {t("sidebar.empty.launch")}
               </button>
             </div>
           ) : (

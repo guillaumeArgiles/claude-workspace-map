@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { layerDepth } from "../config/grid";
+import { t } from "../../i18n";
 import type { AgentState, SubAgentState } from "../../../shared/agent-types";
 import {
   TEACHER_SPRITES,
@@ -224,7 +225,7 @@ export class AgentSyncer {
       if (incoming.has(studentNpc.def.id)) continue;
       if (studentNpc.despawnAt) continue;
       studentNpc.def.status = "done";
-      studentNpc.def.dialogue = "Sub-task complete.";
+      studentNpc.def.dialogue = t("dialogue.subtask_complete");
       this.npcManager.refreshStatusBadge(studentNpc);
       studentNpc.despawnAt = this.scene.time.now + 2500;
     }

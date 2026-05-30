@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { GRID, layerDepth } from "../config/grid";
-import { STATUS_LABEL } from "../../../shared/agent-ui";
+import { t } from "../../i18n";
 import { PLAYER_H } from "../world/gameplayConstants";
 import type { NpcInstance } from "../agents/types";
 
@@ -43,7 +43,8 @@ export class DialogueUI {
   setNearest(npc: NpcInstance | undefined): void {
     if (!this.promptText) return;
     if (npc && this.openFor !== npc) {
-      this.promptText.setText(`[E] ${npc.def.interactLabel ?? `parler à ${npc.def.name}`}`);
+      const label = npc.def.interactLabel ?? t("dialogue.interact.default", { name: npc.def.name });
+      this.promptText.setText(t("dialogue.prompt", { label }));
       this.promptText.setPosition(npc.sprite.x, npc.sprite.y - PLAYER_H);
       this.promptText.setDepth(layerDepth.OVERLAYS + Math.round(npc.sprite.y));
       this.promptText.setVisible(true);
@@ -63,7 +64,7 @@ export class DialogueUI {
     const padding = 10;
     const maxWidth = 340;
     const status = npc.def.status;
-    const statusLabel = status ? STATUS_LABEL[status] : "";
+    const statusLabel = status ? t(`status.${status}`) : "";
     // Teachers: just "Status · Tool" — the project name is already on the
     // house banner. Students: their task description if any, status as fallback.
     let heading: string;

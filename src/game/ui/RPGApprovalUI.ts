@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { layerDepth } from "../config/grid";
 import { uiBus } from "../services/uiBus";
+import { t } from "../../i18n";
 import type { NpcInstance } from "../agents/types";
 
 /**
@@ -199,7 +200,7 @@ export class RPGApprovalUI {
       .slice(0, 4)
       .join("\n");
     objs.push(
-      this.scene.add.text(12, 32, preview || "(plan vide)", {
+      this.scene.add.text(12, 32, preview || t("approval.empty_plan"), {
         fontSize: "11px",
         color: "#d1d5db",
         wordWrap: { width: panelW - 24 },
@@ -254,16 +255,16 @@ export class RPGApprovalUI {
     let msg: string;
     let color: string;
     if (loading) {
-      msg = "Connexion au terminal…   [Esc] Fermer";
+      msg = t("approval.footer.connecting");
       color = "#6b7280";
     } else if (canInteract) {
       msg =
         kind === "plan"
-          ? "[Y] Approuver   [N] Rejeter   [T] Terminal   [Esc] Fermer"
-          : "[1–4] Sélectionner   [T] Terminal   [Esc] Fermer";
+          ? t("approval.footer.plan")
+          : t("approval.footer.questions");
       color = "#86efac";
     } else {
-      msg = "↗ Réponds dans ton terminal Claude Code   [Esc] Fermer";
+      msg = t("approval.footer.external");
       color = "#fbbf24";
     }
     return this.scene.add.text(12, panelH - 22, msg, {

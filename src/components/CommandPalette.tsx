@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentState } from "../../shared/agent-types";
 import { AgentRow, type ActivePty } from "./AgentRow";
+import { useTranslation } from "../i18n";
 
 /**
  * Items the palette renders. Two shapes:
@@ -79,6 +80,7 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ items, onClose }: CommandPaletteProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -146,7 +148,7 @@ export function CommandPalette({ items, onClose }: CommandPaletteProps) {
           ref={inputRef}
           className="cmd-palette-input"
           type="text"
-          placeholder="Type a command or search agents…"
+          placeholder={t("palette.placeholder")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           spellCheck={false}
@@ -154,7 +156,7 @@ export function CommandPalette({ items, onClose }: CommandPaletteProps) {
         />
         <div className="cmd-palette-list" ref={listRef}>
           {filtered.length === 0 ? (
-            <div className="cmd-palette-empty">No matches.</div>
+            <div className="cmd-palette-empty">{t("palette.empty")}</div>
           ) : (
             grouped.map((g) => {
               const isAgentGroup = g.items.every(({ it }) => it.kind === "agent");
@@ -222,9 +224,9 @@ export function CommandPalette({ items, onClose }: CommandPaletteProps) {
           )}
         </div>
         <div className="cmd-palette-footer">
-          <kbd>↑</kbd><kbd>↓</kbd> navigate
-          <kbd>↵</kbd> select
-          <kbd>esc</kbd> close
+          <kbd>↑</kbd><kbd>↓</kbd> {t("palette.footer.navigate")}
+          <kbd>↵</kbd> {t("palette.footer.select")}
+          <kbd>esc</kbd> {t("palette.footer.close")}
         </div>
       </div>
     </div>

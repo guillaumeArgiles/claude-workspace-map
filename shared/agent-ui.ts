@@ -25,16 +25,6 @@ export const STATUS_COLOR_HEX: Record<AgentStatus, number> = Object.fromEntries(
   )
 ) as Record<AgentStatus, number>;
 
-export const STATUS_LABEL: Record<AgentStatus, string> = {
-  planning: "Planning",
-  awaiting_approval: "Awaiting approval",
-  coding: "Coding",
-  running_tool: "Running tool",
-  idle: "Idle",
-  done: "Done",
-  blocked: "Blocked",
-};
-
 /**
  * Sort priority for surfacing agents that need attention. Lower = closer to
  * the top of the list.
