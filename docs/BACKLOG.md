@@ -18,22 +18,22 @@ Conventions :
 
 Roadmap de travail séquentielle, ~4-5 semaines calendaires en mode side project.
 
-### Étape 1 — MCP server (TB.7) — **EN COURS**
+### Étape 1 — MCP server (TB.7) — ✅ **LIVRÉ**
 
-Infrastructure d'abord. Plus tard chaque feature qui manipule des agents passe par cette couche au lieu de réinventer une API custom.
+Infrastructure d'abord. Chaque feature qui manipule des agents passe maintenant par cette couche.
 
-- Spike 1j : lire spec MCP + hello-world `list_agents` hardcodé
-- Impl 2j : `list_agents`, `spawn_agent`, `send_message`, `kill_agent` wirés au state réel
-- Wire 0.5j : refactor Le Professeur pour utiliser le MCP (cas d'usage visible) — sinon 3j d'invisible démoralisant
+- ✅ Spike (`b8f4856`) — stdio server + `list_agents` hardcodé
+- ✅ Impl complète (`f07e2d5`) — 5 tools (list, get_status, spawn, send_message, kill) + 13 specs vitest
+- ✅ Wire Professeur (`7e052ee`) — `.mcp.json` auto-écrit + CLAUDE.md actualisé
+- ✅ HTTP transport (`b4f70ae`) — endpoint `/mcp` mounted dans le serveur principal, kill du path hardcodé, marche en packaging Electron
 
-### Étape 2 — Particles (TA.2)
+### Étape 2 — Particles (TA.2) — ✅ **LIVRÉ**
 
-Contraste plaisir après l'infra. 1 jour, 3 effets bien polis :
-- Sparkles violets sur `coding`
-- Smoke gris sur `blocked`
-- Burst confettis sur task complete
+3 effets, ParticleFx manager + texture procédurale, hookés sur status change via NpcManager.refreshStatusBadge.
 
-Les autres effets attendent ou tombent — ne pas tout faire d'un coup.
+- ✅ TA.2.1 Sparkles violets sur `coding` (`c609fe0`)
+- ✅ TA.2.2 Smoke gris sur `blocked` (`a387b87`)
+- ✅ TA.2.3 Burst confettis sur task complete (`71f37b7`)
 
 ### Étape 3 — Voice IN/OUT pour Le Professeur (TB.3 + TB.4)
 
@@ -84,11 +84,12 @@ Skill : graphisme 2D, shaders, animation, game feel.
   - Overlay lumière douce + ambiance changeante (palette filter)
   - Lampadaires qui s'allument la nuit dans le jardin
   - **Apprentissage** : Phaser pipelines, post-processing, color grading
-- [ ] **TA.2** Particle effects sur status change
-  - Sparkles violets quand un agent passe en `coding`
-  - Smoke quand `blocked`, étoiles dorées sur `awaiting_approval`
-  - Trail derrière le player quand il court
-  - **Apprentissage** : Phaser ParticleEmitter, easing functions
+- [x] **TA.2** Particle effects sur status change — livré 2026-05-30
+  - ✅ Sparkles violets sur `coding` (`c609fe0`)
+  - ✅ Smoke gris sur `blocked` (`a387b87`)
+  - ✅ Burst confettis sur task complete (`71f37b7`)
+  - Reportés (parking lot) : étoiles dorées sur `awaiting_approval`, trail derrière le player, smoke sur idle long
+  - Apprentissage acquis : Phaser ParticleEmitter (continuous + explode), generateTexture pour assets procéduraux, blendMode ADD/NORMAL, gravity/angle/scale/alpha curves
 - [ ] **TA.3** Shaders custom (GLSL)
   - Water shader pour la fontaine du jardin
   - Outline pixel-perfect autour de l'agent actif
@@ -143,10 +144,12 @@ Skill : LLM apps, tool use, agent coordination — directement aligné métier 2
   - Chaque agent a une persona (system prompt custom) éditable depuis l'app
   - Templates : "Senior architect", "QA paranoid", "Speed demon", "Yoda mode"
   - **Apprentissage** : prompt design, A/B testing prompts
-- [ ] **TB.7** FleetView comme MCP server
-  - Exposer la map + agents en MCP : un Claude peut lire l'état de la fleet
-  - Tools : `list_agents`, `spawn_agent`, `send_message`, `kill_agent`
-  - **Apprentissage** : protocole MCP, server-side tool implementation
+- [x] **TB.7** FleetView comme MCP server — livré 2026-05-30
+  - ✅ 5 tools exposés : `list_agents`, `get_agent_status`, `spawn_agent`, `send_message`, `kill_agent`
+  - ✅ Transport HTTP (`/mcp` endpoint mounted dans le serveur principal) — pas de subprocess, pas de path hardcodé, marche en packaging Electron
+  - ✅ Wire Professeur : `.mcp.json` auto-écrit au spawn avec port courant + CLAUDE.md mis à jour pour annoncer les tools
+  - ✅ Transport stdio resté dispo comme fallback (`npm run mcp`) pour clients ne supportant pas HTTP
+  - Apprentissage acquis : protocole MCP, McpServer + StreamableHTTPServerTransport du SDK, hook au statelessmode, `.mcp.json` discovery par Claude Code
 
 ### Thème C — Workspace intelligence
 
