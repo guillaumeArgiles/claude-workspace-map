@@ -7,6 +7,7 @@ import { setValidationErrorSink } from "./parser.js";
 import { ptyManager } from "./pty-manager.js";
 import { spawnProfessor, PROFESSOR_DIR } from "./professor.js";
 import { readConfig, writeConfig } from "./config-store.js";
+import { aggregateStats } from "./stats-aggregator.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 /** MIME types for static file serving (renderer assets in prod). */
@@ -284,6 +285,33 @@ export async function startServer(
         log.warn({ err }, "/api/hook bad payload");
         res.writeHead(400, { "Content-Type": "text/plain" });
         res.end("Bad JSON");
+      }
+      return;
+    }
+
+    // ── Local insights dashboard ─────────────────────────────────────────
+    // Aggregates Claude Code JSONL transcripts on demand. No persistence,
+    // no caching for v1; ~50 files / 100 MB scans in well under a second.
+    if (req.method === "GET" && url.startsWith("/api/stats")) {
+      try {
+        const qs = url.includes("?") ? url.slice(url.indexOf("?") + 1) : "";
+        const params = new URLSearchParams(qs);
+        const fromStr = params.get("from");
+        const toStr = params.get("to");
+        const projectCwd = params.get("projectCwd") ?? undefined;
+        const from = fromStr ? Date.parse(fromStr) : undefined;
+        const to = toStr ? Date.parse(toStr) : undefined;
+        const stats = await aggregateStats({
+          from: Number.isFinite(from) ? from : undefined,
+          to: Number.isFinite(to) ? to : undefined,
+          projectCwd,
+        });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(stats));
+      } catch (err) {
+        log.warn({ err }, "/api/stats failed");
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
       }
       return;
     }

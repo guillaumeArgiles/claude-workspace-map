@@ -8,7 +8,7 @@ import type { AgentState, SubAgentState, PendingQuestion } from "../shared/agent
 
 const log = child("watcher");
 
-const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
+export const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 /** A session is "active" if it had any activity within this many milliseconds. */
 const ACTIVE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 

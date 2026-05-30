@@ -29,10 +29,11 @@ interface AgentSidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   onOpenSettings: () => void;
+  onOpenStats: () => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
-export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSidebarProps) {
+export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats }: AgentSidebarProps) {
   const [agents, setAgents] = useState<AgentState[]>([]);
   const [connected, setConnected] = useState(false);
   const [ptySessions, setPtySessions] = useState<ActivePty[]>([]);
@@ -358,6 +359,14 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
       icon: "⚙",
       onSelect: () => onOpenSettings(),
     });
+    out.push({
+      id: "action:stats",
+      label: "View workspace stats",
+      hint: "D",
+      group: "Actions",
+      icon: "📊",
+      onSelect: () => onOpenStats(),
+    });
     if (typeof Notification !== "undefined" && notifPermission !== "granted") {
       out.push({
         id: "action:enable-notif",
@@ -401,6 +410,8 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
   onToggleRef.current = onToggle;
   const onOpenSettingsRef = useRef(onOpenSettings);
   onOpenSettingsRef.current = onOpenSettings;
+  const onOpenStatsRef = useRef(onOpenStats);
+  onOpenStatsRef.current = onOpenStats;
 
   // Track modal open/close events from Phaser (RPGAgentMenuUI, RPGApprovalUI).
   useEffect(() => {
@@ -493,6 +504,12 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings }: AgentSideb
         case ",":
           e.preventDefault();
           onOpenSettingsRef.current();
+          break;
+
+        // D → open the workspace stats dashboard.
+        case "d": case "D":
+          e.preventDefault();
+          onOpenStatsRef.current();
           break;
 
         // Tab → cycle through agents (player walks to each one in turn)

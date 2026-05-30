@@ -94,7 +94,7 @@ But : observateur → orchestrateur. "Wow moment" pour les démos.
 
 ### Sprint 8 — Polish + métriques
 
-- [ ] **S8.1** Telemetry opt-in (PostHog ou self-hosted) — `session_started`, `message_sent`, `plan_approved`, NPS in-app
+- [ ] **S8.1** Local insights dashboard — agréger `~/.claude/projects/*/` JSONL en KPI (sessions, tokens par modèle, top outils, top projets, plan accept rate) + 3 charts (sessions/jour, top outils, top projets). Modal plein écran ouverte par palette + raccourci `D`. Aucune télémetry, aucune collecte serveur, aucun consentement (pivot 2026-05-30 — les données existent déjà sur la machine, on les rend lisibles).
 - [ ] **S8.2** Raccourcis clavier : 1/2/3 = jump entre houses, Cmd+K chat, drag-n-drop fichiers
 - [ ] **S8.3** Public Beta launch (Product Hunt + Twitter + HN)
 

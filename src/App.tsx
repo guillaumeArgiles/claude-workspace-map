@@ -3,6 +3,7 @@ import Phaser from "phaser";
 import { MapScene } from "./game/scenes/MapScene";
 import { AgentSidebar } from "./components/AgentSidebar";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { StatsDashboard } from "./components/StatsDashboard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { CmdKHint } from "./components/CmdKHint";
 import type { AppConfig } from "../shared/config-schema";
@@ -28,6 +29,7 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   useEffect(() => {
     if (!mountRef.current || gameRef.current) return;
@@ -115,6 +117,7 @@ export function App() {
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed((c) => !c)}
             onOpenSettings={() => setShowSettings(true)}
+            onOpenStats={() => setShowStats(true)}
           />
         </ErrorBoundary>
       </div>
@@ -125,7 +128,8 @@ export function App() {
           onChange={(cfg) => { setConfig(cfg); applyTheme(cfg); }}
         />
       )}
-      <CmdKHint hidden={!sidebarCollapsed} />
+      {showStats && <StatsDashboard onClose={() => setShowStats(false)} />}
+      <CmdKHint hidden={!sidebarCollapsed || showStats || showSettings} />
     </>
   );
 }
