@@ -14,6 +14,46 @@ Conventions :
 
 ---
 
+## Ordre d'attaque actuel (décidé 2026-05-30)
+
+Roadmap de travail séquentielle, ~4-5 semaines calendaires en mode side project.
+
+### Étape 1 — MCP server (TB.7) — **EN COURS**
+
+Infrastructure d'abord. Plus tard chaque feature qui manipule des agents passe par cette couche au lieu de réinventer une API custom.
+
+- Spike 1j : lire spec MCP + hello-world `list_agents` hardcodé
+- Impl 2j : `list_agents`, `spawn_agent`, `send_message`, `kill_agent` wirés au state réel
+- Wire 0.5j : refactor Le Professeur pour utiliser le MCP (cas d'usage visible) — sinon 3j d'invisible démoralisant
+
+### Étape 2 — Particles (TA.2)
+
+Contraste plaisir après l'infra. 1 jour, 3 effets bien polis :
+- Sparkles violets sur `coding`
+- Smoke gris sur `blocked`
+- Burst confettis sur task complete
+
+Les autres effets attendent ou tombent — ne pas tout faire d'un coup.
+
+### Étape 3 — Voice IN/OUT pour Le Professeur (TB.3 + TB.4)
+
+En deux temps :
+
+1. **TB.4 TTS d'abord** (1.5j) — `window.speechSynthesis` ou Coqui local. Faible risque, validation rapide que le Professeur "a une voix".
+2. **TB.3 STT ensuite** (2-3j) — Web Speech API (cloud Google) OU Whisper.cpp wasm (local, plus lourd mais privacy-first et aligné avec le positionnement du dashboard local).
+
+UX cible : aller chercher un café en parlant à son agent.
+
+### Étape 4 — Map polish (thème A partiel)
+
+5 jours **time-boxés**. Livrables précis avant de démarrer :
+- 1-2 nouvelles maisons / bâtiments thématiques (forge ? bibliothèque ?)
+- Objets interactifs (panneau routines TC.3, whiteboard, imprimante)
+- Pass sprites custom (TA.6)
+- Décorations jardin
+
+---
+
 ## Reliquats Phase 1-2 (gardés pour mémoire)
 
 Stories du backlog originel encore ouvertes. Soit reportées au launch (cf STRATEGY.md), soit candidates aux thèmes ci-dessous.
