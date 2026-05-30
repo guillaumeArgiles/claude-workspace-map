@@ -6,6 +6,15 @@ import { STATUS_COLOR_HEX } from "../../../shared/agent-ui";
 import type { NpcInstance } from "../agents/types";
 import type { NpcManager } from "../agents/NpcManager";
 
+/**
+ * Render text at this resolution. `pixelArt: true` in the Phaser config
+ * disables anti-aliasing on the WebGL renderer — that's right for sprites
+ * but makes small text look pixel-fuzzy. Up-rendering each text object to
+ * the device's DPR (2 on Retina) and letting Phaser down-scale gives crisp
+ * text without touching the sprite pipeline.
+ */
+const TEXT_RES = Math.max(2, Math.ceil(globalThis.devicePixelRatio || 1));
+
 type ViewMode = "menu" | "plan";
 
 interface MenuAction {
@@ -722,6 +731,7 @@ export class RPGAgentMenuUI {
         fontSize: "14px",
         fontStyle: "bold",
         color: "#e5e7eb",
+        resolution: TEXT_RES,
       })
     );
 
@@ -734,6 +744,7 @@ export class RPGAgentMenuUI {
         fontSize: "11px",
         color: "#9ca3af",
         wordWrap: { width: panelW - 24 },
+        resolution: TEXT_RES,
       })
     );
 
@@ -753,13 +764,13 @@ export class RPGAgentMenuUI {
         12,
         y,
         `[${i + 1}] ${a.label}`,
-        { fontSize: "12px", fontStyle: "bold", color: accent }
+        { fontSize: "12px", fontStyle: "bold", color: accent, resolution: TEXT_RES }
       );
       const desc = this.scene.add.text(
         34,
         y + 13,
         a.description,
-        { fontSize: "10px", color, wordWrap: { width: panelW - 48 } }
+        { fontSize: "10px", color, wordWrap: { width: panelW - 48 }, resolution: TEXT_RES }
       );
       objs.push(row, desc);
       y += 13 + desc.height + 6;
@@ -769,6 +780,7 @@ export class RPGAgentMenuUI {
       this.scene.add.text(12, panelH - 22, "[1–5] Choisir   [Esc] Fermer", {
         fontSize: "11px",
         color: "#86efac",
+        resolution: TEXT_RES,
       })
     );
   }
@@ -784,6 +796,7 @@ export class RPGAgentMenuUI {
         fontSize: "13px",
         fontStyle: "bold",
         color: "#60a5fa",
+        resolution: TEXT_RES,
       })
     );
 
@@ -794,6 +807,7 @@ export class RPGAgentMenuUI {
         color: "#d1d5db",
         wordWrap: { width: panelW - 24 },
         lineSpacing: 3,
+        resolution: TEXT_RES,
       })
     );
 
@@ -801,6 +815,7 @@ export class RPGAgentMenuUI {
       this.scene.add.text(12, panelH - 22, "[Esc] Retour", {
         fontSize: "11px",
         color: "#86efac",
+        resolution: TEXT_RES,
       })
     );
   }

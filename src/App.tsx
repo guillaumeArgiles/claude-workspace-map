@@ -6,6 +6,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { StatsDashboard } from "./components/StatsDashboard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { CmdKHint } from "./components/CmdKHint";
+import { uiBus } from "./game/services/uiBus";
 import { I18nProvider, detectLocale, setLocale, useTranslation } from "./i18n";
 import type { AppConfig } from "../shared/config-schema";
 
@@ -42,7 +43,18 @@ function AppShell() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  // Tracks open Phaser-side modals (RPGAgentMenuUI, RPGApprovalUI) so we can
+  // hide the floating ⌘K banner — otherwise it overlaps the bottom of the menu.
+  const [phaserModalDepth, setPhaserModalDepth] = useState(0);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    const onModalChange = ({ open }: { open: boolean }) => {
+      setPhaserModalDepth((d) => Math.max(0, d + (open ? 1 : -1)));
+    };
+    uiBus.on("modal_open_changed", onModalChange);
+    return () => uiBus.off("modal_open_changed", onModalChange);
+  }, []);
 
   useEffect(() => {
     if (!mountRef.current || gameRef.current) return;
@@ -147,7 +159,11 @@ function AppShell() {
         />
       )}
       {showStats && <StatsDashboard onClose={() => setShowStats(false)} />}
-      <CmdKHint hidden={!sidebarCollapsed || showStats || showSettings} />
+      <CmdKHint
+        hidden={
+          !sidebarCollapsed || showStats || showSettings || phaserModalDepth > 0
+        }
+      />
     </>
   );
 }

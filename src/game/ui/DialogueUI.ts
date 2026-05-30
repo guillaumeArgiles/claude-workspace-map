@@ -4,6 +4,9 @@ import { t } from "../../i18n";
 import { PLAYER_H } from "../world/gameplayConstants";
 import type { NpcInstance } from "../agents/types";
 
+/** Up-render text @ DPR + downscale → crisp under pixelArt:true Phaser config. */
+const TEXT_RES = Math.max(2, Math.ceil(globalThis.devicePixelRatio || 1));
+
 /**
  * Owns the "Press E to talk" prompt and the speech-bubble container that
  * pops above the NPC we're chatting with. Knows nothing about the player
@@ -24,6 +27,7 @@ export class DialogueUI {
         color: "#ffffff",
         backgroundColor: "#000000cc",
         padding: { x: 6, y: 3 },
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5, 1)
       .setDepth(layerDepth.OVERLAYS)
