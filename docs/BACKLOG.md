@@ -27,13 +27,19 @@ Infrastructure d'abord. Chaque feature qui manipule des agents passe maintenant 
 - ✅ Wire Professeur (`7e052ee`) — `.mcp.json` auto-écrit + CLAUDE.md actualisé
 - ✅ HTTP transport (`b4f70ae`) — endpoint `/mcp` mounted dans le serveur principal, kill du path hardcodé, marche en packaging Electron
 
-### Étape 2 — Particles (TA.2) — ✅ **LIVRÉ**
+### Étape 2 — Particles (TA.2) — ✅ **LIVRÉ + polish UX**
 
-3 effets, ParticleFx manager + texture procédurale, hookés sur status change via NpcManager.refreshStatusBadge.
+Palette signalétique sur status change, hookée via NpcManager.refreshStatusBadge.
 
 - ✅ TA.2.1 Sparkles violets sur `coding` (`c609fe0`)
 - ✅ TA.2.2 Smoke gris sur `blocked` (`a387b87`)
 - ✅ TA.2.3 Burst confettis sur task complete (`71f37b7`)
+- ✅ Fix trigger confettis : `done` était inatteignable, basculé sur transition vers `idle` depuis active (`440def9`)
+- [ ] TA.2.4 Étoiles dorées sur `awaiting_approval` — **À FAIRE** (4e effet, complète la palette)
+
+Bonus UX livré en parallèle (déclenché par dogfooding) :
+- ✅ E → Space : unification des raccourcis, le menu agent absorbe le header status+tool de DialogueUI (`09a0a4a`)
+- ✅ CmdK hint hide quand modal Phaser open + setResolution sur les textes pour kill la police floue causée par pixelArt:true (`f3c0d7f`)
 
 ### Étape 3 — Voice IN/OUT pour Le Professeur (TB.3 + TB.4)
 
@@ -84,11 +90,12 @@ Skill : graphisme 2D, shaders, animation, game feel.
   - Overlay lumière douce + ambiance changeante (palette filter)
   - Lampadaires qui s'allument la nuit dans le jardin
   - **Apprentissage** : Phaser pipelines, post-processing, color grading
-- [x] **TA.2** Particle effects sur status change — livré 2026-05-30
+- [~] **TA.2** Particle effects sur status change — 3/4 livrés 2026-05-30
   - ✅ Sparkles violets sur `coding` (`c609fe0`)
   - ✅ Smoke gris sur `blocked` (`a387b87`)
-  - ✅ Burst confettis sur task complete (`71f37b7`)
-  - Reportés (parking lot) : étoiles dorées sur `awaiting_approval`, trail derrière le player, smoke sur idle long
+  - ✅ Burst confettis sur task complete (`71f37b7`, fix `440def9`)
+  - [ ] **TA.2.4** Étoiles dorées sur `awaiting_approval` (next)
+  - Parking lot : trail derrière le player, smoke sur idle long
   - Apprentissage acquis : Phaser ParticleEmitter (continuous + explode), generateTexture pour assets procéduraux, blendMode ADD/NORMAL, gravity/angle/scale/alpha curves
 - [ ] **TA.3** Shaders custom (GLSL)
   - Water shader pour la fontaine du jardin

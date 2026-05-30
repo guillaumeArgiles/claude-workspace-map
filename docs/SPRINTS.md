@@ -331,6 +331,48 @@ Toute la stratégie produit / launch / kill list est parquée dans [STRATEGY.md]
 
 ---
 
+## Étapes 1 & 2 livrées — 2026-05-30 → 2026-05-31
+
+Première session "mode playground" autour de l'ordre d'attaque fixé : MCP → Particles → Voice → Map polish.
+
+### Étape 1 — MCP server (TB.7) — 4 commits
+
+| Commit | Sujet | Détail |
+|---|---|---|
+| `b8f4856` | Spike stdio | Hello-world `list_agents` hardcodé, smoke test bout-en-bout |
+| `f07e2d5` | Impl complète | 5 tools (list, get_status, spawn, send_message, kill) + 13 specs vitest |
+| `7e052ee` | Wire Professeur | `.mcp.json` auto-écrit au spawn + CLAUDE.md actualisé |
+| `b4f70ae` | HTTP transport | `/mcp` mounted dans le serveur principal, kill du path hardcodé |
+
+**Apprentissage clé** : protocole MCP, `McpServer` + `StreamableHTTPServerTransport` du SDK, stateless mode, `.mcp.json` discovery par Claude Code. Validé via /status + /mcp dans la session du Professeur.
+
+### Étape 2 — Particles (TA.2) + polish UX en parallèle — 6 commits
+
+| Commit | Sujet | Détail |
+|---|---|---|
+| `c609fe0` | TA.2.1 sparkles `coding` | Violet glow ADD, frequency 220ms |
+| `a387b87` | TA.2.2 smoke `blocked` | Gris expand, gravity -10, blend NORMAL |
+| `71f37b7` | TA.2.3 confettis task complete | 28 particles explode multi-couleurs |
+| `440def9` | Fix trigger confettis | `done` était inatteignable, switch vers transition active → `idle` |
+| `09a0a4a` | E → Space unification | Menu agent absorbe le header status+tool de DialogueUI |
+| `f3c0d7f` | Polish UX | CmdK hint hide sur modal + setResolution sur text Phaser (kill police floue) |
+
+**Pivots en route** :
+- Confettis : trigger initial `done` ne pouvait jamais firer (parser passe en `idle`), corrigé en 1 patch
+- E key supprimé : feedback user "doublon avec Space", menu unifié remplace les deux UIs
+- Police floue : conséquence de `pixelArt:true` qui désactive l'AA WebGL → `setResolution(DPR)` par texte
+
+**Apprentissage clé** : Phaser ParticleEmitter (continuous + explode), `generateTexture` pour assets procéduraux, blendMode ADD vs NORMAL, gravity/angle/scale curves. Bonus : raf throttling sur background tab → game loop frozen (à savoir pour tout effet visuel).
+
+**État final** : 10 commits, 81/81 tests verts du début à la fin, dogfooding validé en live via Claude in Chrome MCP.
+
+### Reste de l'étape 2 + suite
+
+- [ ] **TA.2.4** Étoiles dorées sur `awaiting_approval` (next, ~30 min)
+- Après : étape 3 (Voice TTS + STT pour Le Professeur)
+
+---
+
 ## Historique des sprints (avant qu'on tienne ce fichier)
 
 Sprints implicites livrés avant ce backlog, gardés pour mémoire :
