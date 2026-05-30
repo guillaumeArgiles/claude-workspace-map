@@ -15,6 +15,7 @@ import {
 import type { NpcDef, NpcInstance } from "./types";
 import type { NavGrid } from "../world/NavGrid";
 import { CharacterSpriteFactory } from "./CharacterSpriteFactory";
+import type { ParticleFx } from "./ParticleFx";
 
 /**
  * Owns the lifecycle, wander AI, and status overlays for the cast of
@@ -29,6 +30,7 @@ export class NpcManager {
 
   private readonly spriteFactory: CharacterSpriteFactory;
   private navGrid?: NavGrid;
+  private particleFx?: ParticleFx;
 
   constructor(private readonly scene: Phaser.Scene) {
     this.spriteFactory = new CharacterSpriteFactory(scene);
@@ -37,6 +39,11 @@ export class NpcManager {
   /** Wire the nav grid for collision-aware wandering. */
   setNavGrid(grid: NavGrid): void {
     this.navGrid = grid;
+  }
+
+  /** Wire the particle effects layer. Optional — emitters are no-ops if unset. */
+  setParticleFx(fx: ParticleFx): void {
+    this.particleFx = fx;
   }
 
   /** Build the physics group + collider wiring. Call once in scene.create(). */
@@ -114,10 +121,15 @@ export class NpcManager {
       instance.statusBadge = this.makeStatusBadge(def.status ?? "idle");
     }
     this.npcs.push(instance);
+    // Kick off particle effects matching the initial status (e.g. an agent
+    // that appears already mid-`coding` should sparkle immediately, not wait
+    // for the next status update).
+    this.particleFx?.applyForStatus(instance, def.status ?? "idle");
     return instance;
   }
 
   destroy(npc: NpcInstance): void {
+    this.particleFx?.destroy(npc);
     npc.statusBadge?.destroy();
     npc.activityBubble?.destroy();
     npc.statusGlyph?.destroy();
@@ -170,6 +182,8 @@ export class NpcManager {
       npc.activityBubble?.destroy();
       npc.activityBubble = undefined;
     }
+    // TA.2 — particle FX reacts to status (sparkles on coding, etc.)
+    this.particleFx?.applyForStatus(npc, s ?? "idle");
   }
 
   private makeStatusBadge(status: AgentStatus): Phaser.GameObjects.Graphics {

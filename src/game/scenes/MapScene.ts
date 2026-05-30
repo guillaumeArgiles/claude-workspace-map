@@ -7,6 +7,7 @@ import {
 } from "../../../shared/agent-sprites";
 import { CAMERA_ZOOM } from "../world/gameplayConstants";
 import { NpcManager } from "../agents/NpcManager";
+import { ParticleFx } from "../agents/ParticleFx";
 import { AgentSyncer } from "../agents/AgentSyncer";
 import { DialogueUI } from "../ui/DialogueUI";
 import { PlayerController } from "../player/PlayerController";
@@ -36,6 +37,8 @@ export class MapScene extends Phaser.Scene {
   // Managers
   private collision = new CollisionLayer(this);
   private npcManager = new NpcManager(this);
+  /** Particle layer — created lazily in create() because it touches scene resources. */
+  private particleFx?: ParticleFx;
   private dragDrop = new DragDropController(this, this.npcManager);
   private dialogue = new DialogueUI(this);
   private approvalUI = new RPGApprovalUI(this);
@@ -125,6 +128,12 @@ export class MapScene extends Phaser.Scene {
     );
     this.playerController.setNavGrid(navGrid);
     this.npcManager.setNavGrid(navGrid);
+
+    // Particle FX layer — must be wired BEFORE any spawn() so that NPCs which
+    // appear already in an active status (e.g. an existing `coding` agent on
+    // first load) get their emitter immediately.
+    this.particleFx = new ParticleFx(this);
+    this.npcManager.setParticleFx(this.particleFx);
 
     // Physics world bounds — must match the map, not the canvas size.
     // Without this, setCollideWorldBounds(true) clamps to the RESIZE canvas
