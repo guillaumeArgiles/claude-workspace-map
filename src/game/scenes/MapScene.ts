@@ -249,7 +249,10 @@ export class MapScene extends Phaser.Scene {
   update(): void {
     this.playerController.update();
     const now = this.time.now;
-    this.npcManager.updateAll(now, this.dialogue.openNpc);
+    // Freeze the NPC currently in dialogue OR menu — both pin the same
+    // "the player is interacting with this NPC" semantic.
+    const frozen = this.agentMenu.openNpc ?? this.dialogue.openNpc;
+    this.npcManager.updateAll(now, frozen);
     this.agentSyncer.tickDespawns(now);
 
     // Show the 💬 invitation above Professor when no agent needs urgent attention.

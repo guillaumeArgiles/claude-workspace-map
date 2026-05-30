@@ -125,7 +125,7 @@
   "stats.plural.projects.one": "{count} project",
   "stats.plural.projects.other": "{count} projects",
 
-  "dialogue.prompt": "[E] {label}",
+  "dialogue.prompt": "[Space] {label}",
   "dialogue.interact.default": "talk to {name}",
   "dialogue.subtask_complete": "Sub-task complete.",
   "dialogue.status.planning": "Drafting the plan.",

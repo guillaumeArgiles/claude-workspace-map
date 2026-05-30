@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { layerDepth } from "../config/grid";
 import { uiBus } from "../services/uiBus";
 import { t } from "../../i18n";
+import { STATUS_COLOR_HEX } from "../../../shared/agent-ui";
 import type { NpcInstance } from "../agents/types";
 import type { NpcManager } from "../agents/NpcManager";
 
@@ -60,6 +61,11 @@ export class RPGAgentMenuUI {
 
   isOpen(): boolean {
     return this.openFor !== undefined;
+  }
+
+  /** The NPC the menu is currently anchored to (used to freeze its wander). */
+  get openNpc(): NpcInstance | undefined {
+    return this.openFor;
   }
 
   open(npc: NpcInstance): void {
@@ -665,7 +671,9 @@ export class RPGAgentMenuUI {
     const W = cam.width;
     const H = cam.height;
     const panelW = Math.min(W - 40, 460);
-    const panelH = this.view === "plan" ? 220 : 200;
+    // Menu view gained a ~50px header (status + tool detail) when E was
+    // unified into Space, so we need a bit more height.
+    const panelH = this.view === "plan" ? 220 : 250;
     const panelX = (W - panelW) / 2;
     const panelY = H - panelH - 16;
 
@@ -696,16 +704,47 @@ export class RPGAgentMenuUI {
   ): void {
     const npc = this.openFor!;
     const name = npc.def.name || npc.def.id;
+    const status = npc.def.status ?? "idle";
+    const statusColor = STATUS_COLOR_HEX[status];
+    const statusLabel = t(`status.${status}`);
+    const tool = npc.def.currentTool;
+    const detail = npc.def.currentToolDetail;
+
+    // ── Header: colored status dot + agent name (line 1)
+    const dot = this.scene.add.graphics();
+    dot.fillStyle(statusColor, 1);
+    dot.fillCircle(20, 18, 5);
+    dot.lineStyle(1, 0x111111, 0.9);
+    dot.strokeCircle(20, 18, 5);
+    objs.push(dot);
     objs.push(
-      this.scene.add.text(12, 10, `🎮  ${name}`, {
-        fontSize: "13px",
+      this.scene.add.text(32, 10, name, {
+        fontSize: "14px",
         fontStyle: "bold",
-        color: "#60a5fa",
+        color: "#e5e7eb",
       })
     );
 
+    // ── Subheader: status label · tool · detail (line 2)
+    let subheader = statusLabel;
+    if (tool) subheader += `  ·  ${tool}`;
+    if (detail) subheader += `  —  ${detail}`;
+    objs.push(
+      this.scene.add.text(12, 30, subheader, {
+        fontSize: "11px",
+        color: "#9ca3af",
+        wordWrap: { width: panelW - 24 },
+      })
+    );
+
+    // ── Divider between header and actions
+    const divider = this.scene.add.graphics();
+    divider.lineStyle(1, 0x374151, 0.8);
+    divider.lineBetween(12, 56, panelW - 12, 56);
+    objs.push(divider);
+
     const actions = this.buildActions().filter((a) => !a.hidden);
-    let y = 36;
+    let y = 64;
     for (let i = 0; i < actions.length; i++) {
       const a = actions[i];
       const color = a.disabled ? "#6b7280" : "#e5e7eb";

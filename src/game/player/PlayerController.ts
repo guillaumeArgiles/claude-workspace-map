@@ -26,19 +26,24 @@ export interface PlayerControllerDeps {
   findNpcById: (id: string) => NpcInstance | undefined;
   /** Resolve the house an NPC lives in, so the autopilot can route via its entrance. */
   findHouseForNpc: (npc: NpcInstance) => House | undefined;
-  /** Called when the player presses E on the Professor NPC. */
+  /** Called when the player presses Space on the Professor NPC. */
   onProfessorInteract?: () => void;
 }
 
 /**
  * Owns the player sprite and everything keyboard-driven: walking, the
- * 4-direction animation, the "[E] talk to" interaction, and the click-to-walk
- * autopilot fed by the sidebar.
+ * 4-direction animation, the "[Space] talk to" interaction, and the
+ * click-to-walk autopilot fed by the sidebar.
+ *
+ * Note: pre-2026-05-30, two distinct keys split the interaction surface (E
+ * for dialogue/approval, Space for the action menu). They were unified to
+ * Space-only — the agent menu now carries the status+tool header that E
+ * used to surface via DialogueUI. The DialogueUI is retained only for the
+ * floating "[Space] talk to …" prompt above NPCs.
  */
 export class PlayerController {
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private interactKey!: Phaser.Input.Keyboard.Key;
   private menuKey!: Phaser.Input.Keyboard.Key;
   private lastDir: Direction = "down";
   private autoWalk?: AutoWalkState;
@@ -78,16 +83,12 @@ export class PlayerController {
     this.player = sprite;
 
     this.cursors = this.scene.input.keyboard!.createCursorKeys();
-    this.interactKey = this.scene.input.keyboard!.addKey(
-      Phaser.Input.Keyboard.KeyCodes.E
-    );
     this.menuKey = this.scene.input.keyboard!.addKey(
       Phaser.Input.Keyboard.KeyCodes.SPACE
     );
     // Allow DOM inputs (chat, sidebar) to receive key events without Phaser
     // calling preventDefault() on them. Phaser's internal key state tracking
-    // continues to work normally — player movement and E-key interactions are
-    // unaffected.
+    // continues to work normally — player movement and interactions remain OK.
     this.scene.input.keyboard!.disableGlobalCapture();
     this.approvalUI.init();
     this.agentMenu.init();
@@ -138,7 +139,7 @@ export class PlayerController {
             this.autoWalk = undefined;
             const target = this.deps.findNpcById(targetId);
             if (target) {
-              this.dialogue.open(target);
+              this.openInteractionFor(target);
             }
           }
         } else {
@@ -195,7 +196,6 @@ export class PlayerController {
     this.approvalUI.update();
     this.agentMenu.update();
     this.updateNearestNpc();
-    this.updateDialogueInput();
     this.updateMenuInput();
   }
 
@@ -295,48 +295,39 @@ export class PlayerController {
       }
     }
     if (!best) return;
-    if (best.def.id === "professor") return; // Professor uses E only.
 
-    // If a speech bubble is open on this NPC, close it before showing the menu.
-    if (this.dialogue.isOpen()) this.dialogue.close();
-    this.agentMenu.open(best);
+    this.openInteractionFor(best);
   }
 
-  private updateDialogueInput(): void {
-    // The approval UI handles its own key input in update() — don't interfere.
-    if (this.approvalUI.isOpen()) return;
-
-    if (!Phaser.Input.Keyboard.JustDown(this.interactKey)) return;
-    if (this.dialogue.isOpen()) {
-      this.dialogue.close();
-      return;
-    }
-    // Re-evaluate the nearest NPC so pressing E always uses the freshest target.
-    let best: NpcInstance | undefined;
-    let bestDist = INTERACTION_RADIUS;
-    for (const npc of this.npcManager.npcs) {
-      const d = Math.hypot(npc.sprite.x - this.player.x, npc.sprite.y - this.player.y);
-      if (d < bestDist) {
-        bestDist = d;
-        best = npc;
-      }
-    }
-    if (!best) return;
-
-    // Professor NPC → spawn his Claude Code session directly.
-    if (best.def.id === "professor") {
+  /**
+   * Single entry point for "interact with this NPC". Replaces the old E/Space
+   * split. Routes the target NPC to the most appropriate UI:
+   *
+   * - Le Professeur → `onProfessorInteract` (spawn/reuse his session)
+   * - awaiting_approval + pending plan/questions → RPGApprovalUI (urgent)
+   * - everything else → RPGAgentMenuUI (status header + 5 actions)
+   *
+   * The legacy DialogueUI is no longer opened — its info (status, tool,
+   * detail) is now shown at the top of the agent menu.
+   */
+  private openInteractionFor(npc: NpcInstance): void {
+    if (npc.def.id === "professor") {
       this.deps.onProfessorInteract?.();
       return;
     }
 
-    // P0: awaiting_approval NPCs with pending data get the RPG approval dialogue.
+    // Close any leftover floating bubble (shouldn't normally be open, but
+    // we may add fallbacks later that re-enable it).
+    if (this.dialogue.isOpen()) this.dialogue.close();
+
     const hasPending =
-      best.def.pendingPlan !== undefined ||
-      (best.def.pendingQuestions?.length ?? 0) > 0;
-    if (best.def.status === "awaiting_approval" && hasPending) {
-      this.approvalUI.open(best);
-    } else {
-      this.dialogue.open(best);
+      npc.def.pendingPlan !== undefined ||
+      (npc.def.pendingQuestions?.length ?? 0) > 0;
+    if (npc.def.status === "awaiting_approval" && hasPending) {
+      this.approvalUI.open(npc);
+      return;
     }
+
+    this.agentMenu.open(npc);
   }
 }
