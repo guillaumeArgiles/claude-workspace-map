@@ -200,6 +200,109 @@ Budget : 4.5j dev sur 10j calendaires.
 
 ---
 
+## Sprint 5 — PTY launcher (livré)
+
+**Phase** : 2 — Talk to Agents
+**Goal** : sortir du mode observateur. Lancer + reprendre + contrôler une session Claude Code depuis la map.
+
+| ID | Story | Statut |
+|---|---|---|
+| S5.1 | Intégration `node-pty` côté server | **livré** (`ec728eb`) |
+| S5.2 | `POST /api/sessions` — lance Claude en PTY | **livré** (`ec728eb`) |
+| S5.3 | UI "Spawn Claude" (palette + sidebar) | **livré** (`ec728eb`) |
+| S5.4 | Terminal overlay xterm.js + minimize-to-badge | **livré** (`bab1ae6`, `3893bdb`) |
+| —    | Crash recovery v2.1.x (originalFile null) | **livré bonus** (`aedb0c6`, `98b6845`) |
+| —    | Resume via `claude --continue` | **livré bonus** (`1ea31b4`, `d02ffd6`) |
+
+### État final
+
+- Toutes les stories S5.1–S5.4 livrées
+- xterm.js retenu après tentative pre+input — isolation clavier propre via `attachCustomKeyEventHandler` (`43e156e`)
+- Bug Claude Code v2.1.x découvert en dogfooding → bannière de recovery automatique avec respawn fresh
+
+---
+
+## Sprint 6 — Talk to existing session (pivot)
+
+**Phase** : 2 — Talk to Agents
+**Goal** initial : chat panel slide-in pour envoyer du texte aux agents.
+
+| ID | Story | Statut |
+|---|---|---|
+| S6.1 | Chat panel inline dans la sidebar | **livré puis retiré** (`866dd09` → `e1f254e`) |
+| S6.2 | Display PTY output dans le chat | **livré puis retiré** (`4b27b35`) |
+| S6.3 | Thinking indicator | **livré puis retiré** (`51c0266`) |
+
+### Pivot
+
+Après dogfooding, le chat panel inline doublonne le terminal overlay (déjà branché sur le même PTY). Décision : supprimer le chat panel, le terminal overlay reste le canal unique pour parler à un agent. Économie de code + cohérence d'UX.
+
+S6.4 (politique sessions externes / tmux) reporté — non bloquant tant que les users restent dans le PTY interne.
+
+---
+
+## Sprint 7 — Réponses contextuelles + RPG dialogue (livré + bonus)
+
+**Phase** : 2 — Talk to Agents
+**Goal** : que l'utilisateur réponde à `ExitPlanMode` et `AskUserQuestion` sans quitter la map. Et que la map devienne vraiment vivante.
+
+| ID | Story | Statut |
+|---|---|---|
+| S7.1 | UI dédiée AskUserQuestion (radio + submit) | **livré** (`8a767d6`) |
+| S7.2 | Modal ExitPlanMode (plan + Approve/Reject) | **livré via inline widget** (`8a767d6`) |
+| S7.3 | Notifications natives `awaiting_approval` / `blocked` | **livré** (`5e96f77`) |
+| S7.4 | Notarisation macOS Developer ID | **reporté** (Apple Developer ID payant) |
+| S7.5 | Comportement par statut → POIs par maison | **reporté** |
+| S7.6 | Panneau Scheduled routines dans le jardin | **reporté** |
+| B3   | RPG agent interactions (E key, dialogue NPC) | **livré bonus** (`1743f53`) |
+| B4   | Le Professeur — orchestrateur IA streaming | **livré bonus** (`e6eb2e0`, refactor PTY `cc16970`) |
+| —    | Dismiss agents (✕ par ligne + 🧹 bulk) | **livré bonus** (`7ab5f58`) |
+| —    | Keyboard shortcuts pour tout (N/P/E/1-3/B/Esc) | **livré bonus** (`db65f7d`) |
+| —    | NPC status animations + RPG design polish (S8b) | **livré bonus** (`e99f16d`) |
+
+### Décisions
+
+- **Approval widget inline plutôt que modal** : ExitPlanMode + AskUserQuestion partagent le même widget dans la sidebar — plus discret, pas d'interruption focus. La modal RPG (`RPGApprovalUI`) répond au même besoin côté map (E sur un NPC en attente).
+- **Professeur via PTY plutôt que Anthropic SDK** : cohérence avec les autres agents, pas de clef API à gérer, l'orchestrateur peut utiliser tous les tools de Claude Code.
+- **S7.4/S7.5/S7.6** restent au backlog. La notarisation deviendra bloquante avant la beta publique ; les POIs et routines sont du polish "workspace vivant" qui peut attendre les premiers retours users.
+
+---
+
+## Sprint 8 — Polish + métriques + i18n (livré, pivots)
+
+**Phase** : 2 — Talk to Agents (final)
+**Goal initial** : KPIs + télémetry, raccourcis clavier, beta publique.
+
+| ID | Story | Statut |
+|---|---|---|
+| S8.1 | Local insights dashboard (KPIs + 3 charts, `D` shortcut) | **livré** (`3b60945`) |
+| S8.2 | Palette `⌘K` + drag-n-drop NPCs entre houses | **livré** (`c305171`) |
+| S8.3 | Public Beta launch (Show HN + Product Hunt) | **non démarré** |
+| —    | Agent context menu (`Space` → terminal/plan/btw/fast/kill) | **livré bonus** (`9d4d34e`) |
+| —    | Persistent settings panel (theme, sidebar width, port) — S4.2 rattrapé | **livré bonus** (`aab90c5`) |
+| —    | Landing page marketing — S4.4 rattrapé | **livré bonus** (`da5f023`) |
+| —    | i18n EN / FR / ES (Zod `locale` + hand-rolled module) | **livré bonus** (`a80ebe1`) |
+| —    | Docs à jour (README + landing) reflet des features semaine | **livré** (`a6cf858`) |
+
+### Pivots
+
+- **S8.1 reframed (pivot 2026-05-30)** : abandon de la collection d'events télémetry + consent banner. À la place, lecture des JSONL existants qui sont déjà sur la machine → dashboard local, zero télémetry. Moins ambitieux mais ship-able le jour même, et plus aligné avec la valeur "privacy-first" du produit.
+- **i18n unscoped** : pas dans le sprint planning initial. Ajouté en cours de route parce que le moment est bon (la surface UI vient de doubler avec palette + stats + settings) avant que la dette cristallise. Hand-rolled (~155 lignes, zero dep) plutôt que react-i18next vu la taille de la surface.
+
+### État final
+
+- 2/3 stories planifiées livrées, S8.3 reportée
+- 4 bonus livrés (context menu, settings, landing, i18n)
+- 68/68 tests verts, `tsc --noEmit` clean après chaque commit
+- Phase 2 (Talk to Agents) est techniquement complète — il reste S8.3 (launch) et les nice-to-have S7.4/S7.5/S7.6
+
+### Ce qu'on garde pour la suite
+
+- **Avant prochain feature work** : décider entre (1) ship & valider (S8.3 + S7.4 notarisation + tag v0.2.0), (2) finir Phase 2 (S7.5 POIs, S7.6 routines, chat panel free-text), ou (3) attaquer Phase 3 (cloud sync).
+- **Dette repérée** : `NpcManager.ts` (619 lignes) à splitter (PT.5), `docs/SPRINTS.md` rafraîchi maintenant, screenshots stats dashboard à capturer manuellement.
+
+---
+
 ## Historique des sprints (avant qu'on tienne ce fichier)
 
 Sprints implicites livrés avant ce backlog, gardés pour mémoire :
