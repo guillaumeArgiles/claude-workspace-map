@@ -18,6 +18,7 @@
     "package": "electron-vite build && electron-builder",
     "package:dir": "electron-vite build && electron-builder --dir",
     "preview": "vite preview",
+    "preview:landing": "open landing/index.html",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
