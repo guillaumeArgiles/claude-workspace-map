@@ -64,11 +64,18 @@ export class ParticleFx {
       entry.smoke = undefined;
     }
 
-    // ─── transition → done : one-shot confettis ─────────────────────────────
-    // `done` côté watcher == turnEnded (stop_hook_summary sans tool_use plus
-    // récent). Le check `prev !== undefined` évite le burst au boot pour les
-    // agents déjà en `done` au moment du chargement.
-    if (status === "done" && prev !== undefined && prev !== "done") {
+    // ─── task complete → one-shot confettis ─────────────────────────────────
+    // Le parser passe en `idle` quand un stop_hook fire (turn fini par l'agent).
+    // Status `done` n'arrive en pratique que sur SessionEnd ou via sous-agents,
+    // d'où l'option de tirer aussi sur transition active → idle.
+    const becameDone = status === "done" && prev !== undefined && prev !== "done";
+    const finishedTurn =
+      status === "idle" &&
+      (prev === "coding" ||
+        prev === "running_tool" ||
+        prev === "planning" ||
+        prev === "awaiting_approval");
+    if (becameDone || finishedTurn) {
       this.fireConfetti(npc);
     }
 

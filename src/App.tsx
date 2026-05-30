@@ -70,6 +70,10 @@ function AppShell() {
       },
       scene: [MapScene],
     });
+    // DEBUG: expose le game pour inspection depuis la console (et Claude in Chrome).
+    // Bénin en prod (1 ref de plus sur window), pratique en dev. À retirer si
+    // souci de surface d'attaque sur une build publique.
+    (window as unknown as { __game?: Phaser.Game }).__game = game;
 
     // Keep the canvas in lock-step with #game-mount via a ResizeObserver.
     // Covers BOTH the sidebar toggle (mount width changes) AND native window
