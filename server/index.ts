@@ -22,6 +22,7 @@ import {
   startRoutinesScheduler,
   stopRoutinesScheduler,
 } from "./routines-scheduler.js";
+import { listNativeRoutines } from "./native-routines.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 /** MIME types for static file serving (renderer assets in prod). */
@@ -358,10 +359,14 @@ export async function startServer(
 
     if (req.method === "GET" && url === "/api/routines") {
       try {
-        const fleet = await listRoutines();
+        // FleetView store + Claude-native sources, read in parallel.
+        const [fleet, native] = await Promise.all([
+          listRoutines(),
+          listNativeRoutines(),
+        ]);
         const fleetWithNext = fleet.map((r) => ({ ...r, nextRunAt: nextRunAtFor(r) }));
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ fleet: fleetWithNext, native: [] }));
+        res.end(JSON.stringify({ fleet: fleetWithNext, native }));
       } catch (err) {
         log.warn({ err }, "GET /api/routines failed");
         res.writeHead(500, { "Content-Type": "application/json" });
