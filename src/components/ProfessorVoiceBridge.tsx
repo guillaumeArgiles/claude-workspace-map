@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { uiBus } from "../game/services/uiBus";
 import { voiceService } from "../services/voiceService";
 import type { AgentState, ServerEvent } from "../../shared/agent-types";
 import type { Locale } from "../../shared/config-schema";
@@ -15,9 +14,12 @@ import type { Locale } from "../../shared/config-schema";
  * lastAssistantText`. We subscribe to the `/api/events` SSE stream and
  * watch that field change for the Professor's session.
  *
- * **Identifying the Professor** : `professor_spawned` (fired by
- * AgentSidebar.spawnProfessor) carries the cwd. We match incoming
- * `agent_updated` events by cwd to know we're looking at his agent.
+ * **Identifying the Professor by cwd pattern** : every Claude session run
+ * inside the dedicated `~/.claude-workspace-map/professor/` dir is a
+ * Professor. We match `agent.cwd.endsWith(PROFESSOR_DIR_SUFFIX)` instead
+ * of relying on the `professor_spawned` uiBus event — that approach
+ * missed cases where the Professor was spawned before the page loaded
+ * (no event fires for already-running sessions on mount).
  *
  * `enabled` and `locale` come from AppConfig — toggled in Settings. We
  * pipe them through to the voice service so it stays in sync.
@@ -29,7 +31,6 @@ export function ProfessorVoiceBridge({
   enabled: boolean;
   locale: Locale;
 }) {
-  // Sync voice service state with user preferences as they change.
   useEffect(() => {
     voiceService.setEnabled(enabled);
   }, [enabled]);
@@ -37,16 +38,14 @@ export function ProfessorVoiceBridge({
     voiceService.setLocale(locale);
   }, [locale]);
 
-  // Track : the Professor's cwd (used to identify his agent in SSE
-  // events) and the last assistant text we already spoke (so we only
-  // queue *new* prose).
-  const professorCwdRef = useRef<string | null>(null);
-  const lastSpokenRef = useRef<string>("");
+  /**
+   * Per-Professor-sessionId tracking : remember the last text we already
+   * sent to TTS, keyed by sessionId. A new session resets its own entry
+   * automatically when the bridge first sees its agent_spawned event.
+   */
+  const spokenBySession = useRef<Map<string, string>>(new Map());
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // SSE subscription — opened once for the whole app lifetime. We don't
-  // depend on the Professor being spawned to subscribe ; the stream is
-  // cheap and we just need to be ready when his agent appears.
   useEffect(() => {
     const es = new EventSource("/api/events");
     eventSourceRef.current = es;
@@ -56,11 +55,29 @@ export function ProfessorVoiceBridge({
         const data = JSON.parse(ev.data) as ServerEvent;
         switch (data.type) {
           case "snapshot":
-            for (const agent of data.agents) handleAgent(agent);
+            // On first connect we seed the per-session tracking WITHOUT
+            // speaking — we don't want to read the entire conversation
+            // history on every page reload.
+            for (const agent of data.agents) {
+              if (!isProfessor(agent)) continue;
+              spokenBySession.current.set(
+                agent.sessionId,
+                agent.lastAssistantText ?? ""
+              );
+            }
             break;
           case "agent_spawned":
+            // A fresh Professor session is starting — initialise its tracking
+            // entry to "" so the first response IS spoken.
+            if (isProfessor(data.agent)) {
+              spokenBySession.current.set(data.agent.sessionId, "");
+            }
+            break;
           case "agent_updated":
-            handleAgent(data.agent);
+            if (isProfessor(data.agent)) handleProfessorUpdate(data.agent);
+            break;
+          case "agent_removed":
+            spokenBySession.current.delete(data.sessionId);
             break;
         }
       } catch {
@@ -74,36 +91,31 @@ export function ProfessorVoiceBridge({
       voiceService.cancel();
     };
 
-    function handleAgent(agent: AgentState) {
-      const cwd = professorCwdRef.current;
-      if (!cwd || agent.cwd !== cwd) return;
+    function handleProfessorUpdate(agent: AgentState) {
       const text = agent.lastAssistantText?.trim();
       if (!text) return;
-      // Detect a fresh turn vs. an append. If the previous text is a
-      // prefix of the new one, only speak the suffix. Otherwise speak
-      // the whole new turn — Claude has moved on.
-      const prev = lastSpokenRef.current;
-      const delta = text.startsWith(prev) ? text.slice(prev.length) : text;
-      lastSpokenRef.current = text;
-      const fragment = delta.trim();
-      if (!fragment) return;
+      const prev = spokenBySession.current.get(agent.sessionId) ?? "";
+      if (text === prev) return;
+      // Detect delta vs full replacement. When Claude streams a turn,
+      // each JSONL update appends — so `text.startsWith(prev)` lets us
+      // speak only the new tail. Otherwise it's a fresh turn → speak
+      // the whole new text.
+      const fragment = text.startsWith(prev) ? text.slice(prev.length) : text;
+      spokenBySession.current.set(agent.sessionId, text);
+      const trimmed = fragment.trim();
+      if (!trimmed) return;
       // eslint-disable-next-line no-console
-      console.log("[TTS]", JSON.stringify(fragment));
-      voiceService.speak(fragment);
+      console.log("[TTS]", JSON.stringify(trimmed));
+      voiceService.speak(trimmed);
     }
   }, []);
 
-  // Listen for new Professor spawns so we know which cwd to look for in
-  // the SSE stream + reset our state.
-  useEffect(() => {
-    const handler = ({ cwd }: { ptyId: string; cwd: string }) => {
-      professorCwdRef.current = cwd;
-      lastSpokenRef.current = "";
-      voiceService.cancel();
-    };
-    uiBus.on("professor_spawned", handler);
-    return () => uiBus.off("professor_spawned", handler);
-  }, []);
-
   return null;
+}
+
+/** Identifies the Professor by his dedicated working directory. */
+const PROFESSOR_DIR_SUFFIX = "/.claude-workspace-map/professor";
+
+function isProfessor(agent: AgentState): boolean {
+  return agent.cwd.endsWith(PROFESSOR_DIR_SUFFIX);
 }
