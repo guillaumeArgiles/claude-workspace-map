@@ -89,13 +89,17 @@ export class RPGRoutinesUI {
 
   init(): void {
     const kb = this.scene.input.keyboard!;
-    this.keyEsc = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-    this.keyN = kb.addKey(Phaser.Input.Keyboard.KeyCodes.N);
-    this.keyE = kb.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-    this.keyD = kb.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    this.keyY = kb.addKey(Phaser.Input.Keyboard.KeyCodes.Y);
-    this.keyDown = kb.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-    this.keyUp = kb.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
+    // Pass `enableCapture=false` so Phaser tracks JustDown for our hotkeys
+    // WITHOUT calling preventDefault on the keydown — otherwise the letter
+    // keys (n, e, d, y) would never reach the DOM <input>/<textarea>
+    // elements we overlay on the create/edit forms.
+    this.keyEsc = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC, false);
+    this.keyN = kb.addKey(Phaser.Input.Keyboard.KeyCodes.N, false);
+    this.keyE = kb.addKey(Phaser.Input.Keyboard.KeyCodes.E, false);
+    this.keyD = kb.addKey(Phaser.Input.Keyboard.KeyCodes.D, false);
+    this.keyY = kb.addKey(Phaser.Input.Keyboard.KeyCodes.Y, false);
+    this.keyDown = kb.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN, false);
+    this.keyUp = kb.addKey(Phaser.Input.Keyboard.KeyCodes.UP, false);
     // Form Enter / Cmd+Enter are handled by the DOM elements directly,
     // not by Phaser key listeners.
   }

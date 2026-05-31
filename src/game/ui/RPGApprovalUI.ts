@@ -30,15 +30,20 @@ export class RPGApprovalUI {
 
   init(): void {
     const kb = this.scene.input.keyboard!;
-    this.keyY   = kb.addKey(Phaser.Input.Keyboard.KeyCodes.Y);
-    this.keyN   = kb.addKey(Phaser.Input.Keyboard.KeyCodes.N);
-    this.keyT   = kb.addKey(Phaser.Input.Keyboard.KeyCodes.T);
-    this.keyEsc = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    // Pass `enableCapture=false` so y/n/t reach DOM <input>/<textarea>
+    // overlays (e.g. RPGRoutinesUI forms) when the approval UI isn't open.
+    // Phaser still tracks JustDown for our hotkeys.
+    this.keyY   = kb.addKey(Phaser.Input.Keyboard.KeyCodes.Y, false);
+    this.keyN   = kb.addKey(Phaser.Input.Keyboard.KeyCodes.N, false);
+    this.keyT   = kb.addKey(Phaser.Input.Keyboard.KeyCodes.T, false);
+    this.keyEsc = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC, false);
+    // Numeric option keys can also conflict if a form ever has a number
+    // input — kept non-capturing for consistency.
     this.keyNums = [
-      kb.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
-      kb.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
-      kb.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
-      kb.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
+      kb.addKey(Phaser.Input.Keyboard.KeyCodes.ONE, false),
+      kb.addKey(Phaser.Input.Keyboard.KeyCodes.TWO, false),
+      kb.addKey(Phaser.Input.Keyboard.KeyCodes.THREE, false),
+      kb.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR, false),
     ];
   }
 

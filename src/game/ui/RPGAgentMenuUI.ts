@@ -58,13 +58,16 @@ export class RPGAgentMenuUI {
 
   init(): void {
     const kb = this.scene.input.keyboard!;
-    this.keyEsc = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    // `enableCapture=false` so JustDown still works but the keys reach
+    // DOM elements (forms, terminals, etc.) without being eaten by
+    // Phaser's preventDefault.
+    this.keyEsc = kb.addKey(Phaser.Input.Keyboard.KeyCodes.ESC, false);
     this.keyNums = [
-      kb.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
-      kb.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
-      kb.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
-      kb.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
-      kb.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
+      kb.addKey(Phaser.Input.Keyboard.KeyCodes.ONE, false),
+      kb.addKey(Phaser.Input.Keyboard.KeyCodes.TWO, false),
+      kb.addKey(Phaser.Input.Keyboard.KeyCodes.THREE, false),
+      kb.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR, false),
+      kb.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE, false),
     ];
   }
 
