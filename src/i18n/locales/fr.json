@@ -181,5 +181,20 @@
   "routines.last_run": "dernier {when}",
   "routines.more_hidden": "+ {count} autres routines non affichées",
   "routines.footer.phase3": "[Esc] Fermer   (création/édition arrive en phase 4)",
-  "routines.footer.close": "[Esc] Fermer"
+  "routines.footer.close": "[Esc] Fermer",
+
+  "routines.title.create": "➕ Nouvelle routine",
+  "routines.title.edit": "✏️  Modifier la routine",
+  "routines.title.delete": "🗑  Supprimer la routine ?",
+  "routines.form.name": "Nom",
+  "routines.form.frequency": "Fréquence",
+  "routines.form.cron_custom": "Cron expression (5 champs, fuseau local)",
+  "routines.form.prompt": "Prompt envoyé à Claude à chaque exécution",
+  "routines.form.cwd": "Dossier de travail (optionnel)",
+  "routines.delete.confirm": "Supprimer définitivement « {name} » ?",
+  "routines.delete.warn": "L'historique d'exécution est aussi effacé. Action irréversible.",
+  "routines.footer.list_empty": "[N] Nouvelle routine   [Esc] Fermer",
+  "routines.footer.list_with_selection": "[↑↓] Naviguer · [N] Nouvelle · [E] Éditer · [D] Supprimer · [Esc] Fermer",
+  "routines.footer.form": "[⏎] Valider · [Esc] Annuler   (Cmd+⏎ dans le prompt)",
+  "routines.footer.delete": "[Y] Confirmer · [Esc] Annuler"
 }

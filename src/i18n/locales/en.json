@@ -181,5 +181,20 @@
   "routines.last_run": "last {when}",
   "routines.more_hidden": "+ {count} more routines hidden",
   "routines.footer.phase3": "[Esc] Close   (create/edit coming in phase 4)",
-  "routines.footer.close": "[Esc] Close"
+  "routines.footer.close": "[Esc] Close",
+
+  "routines.title.create": "➕ New routine",
+  "routines.title.edit": "✏️  Edit routine",
+  "routines.title.delete": "🗑  Delete routine?",
+  "routines.form.name": "Name",
+  "routines.form.frequency": "Frequency",
+  "routines.form.cron_custom": "Cron expression (5 fields, local timezone)",
+  "routines.form.prompt": "Prompt sent to Claude on each run",
+  "routines.form.cwd": "Working directory (optional)",
+  "routines.delete.confirm": "Permanently delete \"{name}\"?",
+  "routines.delete.warn": "Run history is wiped too. Irreversible.",
+  "routines.footer.list_empty": "[N] New routine   [Esc] Close",
+  "routines.footer.list_with_selection": "[↑↓] Navigate · [N] New · [E] Edit · [D] Delete · [Esc] Close",
+  "routines.footer.form": "[⏎] Submit · [Esc] Cancel   (Cmd+⏎ in the prompt)",
+  "routines.footer.delete": "[Y] Confirm · [Esc] Cancel"
 }

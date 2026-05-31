@@ -68,6 +68,10 @@ function AppShell() {
       backgroundColor: "#1a1a1a",
       pixelArt: true,
       roundPixels: true,
+      // Enables `scene.add.dom(...)` so we can overlay real HTML <input>/
+      // <textarea>/<select> on top of the canvas for in-game forms
+      // (used by RPGRoutinesUI's create/edit views).
+      dom: { createContainer: true },
       physics: {
         default: "arcade",
         arcade: { debug: false },

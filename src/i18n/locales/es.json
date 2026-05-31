@@ -181,5 +181,20 @@
   "routines.last_run": "última {when}",
   "routines.more_hidden": "+ {count} rutinas más ocultas",
   "routines.footer.phase3": "[Esc] Cerrar   (crear/editar llegará en la fase 4)",
-  "routines.footer.close": "[Esc] Cerrar"
+  "routines.footer.close": "[Esc] Cerrar",
+
+  "routines.title.create": "➕ Nueva rutina",
+  "routines.title.edit": "✏️  Editar rutina",
+  "routines.title.delete": "🗑  ¿Eliminar rutina?",
+  "routines.form.name": "Nombre",
+  "routines.form.frequency": "Frecuencia",
+  "routines.form.cron_custom": "Expresión cron (5 campos, zona horaria local)",
+  "routines.form.prompt": "Prompt enviado a Claude en cada ejecución",
+  "routines.form.cwd": "Directorio de trabajo (opcional)",
+  "routines.delete.confirm": "¿Eliminar definitivamente «{name}»?",
+  "routines.delete.warn": "El historial de ejecución también se borra. Acción irreversible.",
+  "routines.footer.list_empty": "[N] Nueva rutina   [Esc] Cerrar",
+  "routines.footer.list_with_selection": "[↑↓] Navegar · [N] Nueva · [E] Editar · [D] Eliminar · [Esc] Cerrar",
+  "routines.footer.form": "[⏎] Confirmar · [Esc] Cancelar   (Cmd+⏎ en el prompt)",
+  "routines.footer.delete": "[Y] Confirmar · [Esc] Cancelar"
 }
