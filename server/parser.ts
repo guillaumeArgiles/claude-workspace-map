@@ -121,6 +121,13 @@ export interface ParsedLine {
   /** True if the last assistant content block was a stop_hook_summary. */
   isStopHook: boolean;
   hasText: boolean;
+  /**
+   * Concatenated prose from this line's text content blocks (assistant only).
+   * Empty string when no text blocks. Used by the TTS pipeline to read
+   * Claude's responses from the clean JSONL stream rather than the noisy
+   * PTY output (cursor sequences, status spinners, prompt echoes).
+   */
+  assistantText: string;
 }
 
 /**
@@ -172,6 +179,8 @@ export function parseLine(raw: string): ParsedLine | null {
     ? messageResult.data.content ?? []
     : [];
 
+  let assistantText = "";
+
   if (type === "system") {
     systemSubtype = line.subtype;
   } else if (type === "assistant") {
@@ -186,6 +195,10 @@ export function parseLine(raw: string): ParsedLine | null {
         });
       } else if (block.type === "text") {
         hasText = true;
+        const b = block as { text?: string };
+        if (b.text) {
+          assistantText += assistantText ? `\n${b.text}` : b.text;
+        }
       }
     }
   } else if (type === "user") {
@@ -213,6 +226,7 @@ export function parseLine(raw: string): ParsedLine | null {
     systemSubtype,
     isStopHook,
     hasText,
+    assistantText,
   };
 }
 

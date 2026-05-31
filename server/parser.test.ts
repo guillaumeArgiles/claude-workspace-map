@@ -100,7 +100,28 @@ describe("parseLine", () => {
     expect(parsed!.toolUses).toHaveLength(1);
     expect(parsed!.toolUses[0]).toMatchObject({ toolUseId: "tu_1", name: "Bash" });
     expect(parsed!.hasText).toBe(true);
+    expect(parsed!.assistantText).toBe("Listing the files.");
     expect(parsed!.isSidechain).toBe(false);
+  });
+
+  it("extracts text content for TTS — assistantText surfaced from text blocks", () => {
+    const parsed = parseLine(
+      assistantLine({
+        text: "Bonjour ! Voici ma synthèse en deux phrases.",
+      })
+    );
+    expect(parsed!.assistantText).toBe("Bonjour ! Voici ma synthèse en deux phrases.");
+    expect(parsed!.hasText).toBe(true);
+  });
+
+  it("returns empty assistantText when the line has only tool_use blocks", () => {
+    const parsed = parseLine(
+      assistantLine({
+        toolUses: [{ id: "tu_1", name: "Read", input: { file_path: "/x" } }],
+      })
+    );
+    expect(parsed!.assistantText).toBe("");
+    expect(parsed!.hasText).toBe(false);
   });
 
   it("parses a user tool_result", () => {

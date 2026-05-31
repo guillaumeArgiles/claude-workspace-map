@@ -51,3 +51,11 @@ class UiBus {
 }
 
 export const uiBus = new UiBus();
+
+// DEBUG : expose the singleton so Chrome MCP / DevTools can emit/inspect.
+// Dynamic imports get a different module instance under Vite (?v=hash cache
+// busting on static imports), so `import('/src/game/services/uiBus')` would
+// give a fresh empty bus. Window-stash is the only reliable access path.
+if (typeof window !== "undefined") {
+  (window as unknown as { __uiBus: UiBus }).__uiBus = uiBus;
+}

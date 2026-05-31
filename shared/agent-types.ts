@@ -69,6 +69,16 @@ export interface AgentState {
   pendingPlan?: string;
   /** Populated when currentTool === 'AskUserQuestion'. Questions to display. */
   pendingQuestions?: PendingQuestion[];
+  /**
+   * Most recent assistant prose seen in this session's JSONL. Empty until
+   * Claude produces a text content block. Used by the TTS pipeline for
+   * Le Professeur — reading from this is cleaner than the noisy PTY output
+   * (no cursor sequences, no prompt echoes, no thinking spinners).
+   *
+   * Updated whenever a new assistant line with text is parsed. Consumers
+   * should diff against the previous value to detect a fresh turn.
+   */
+  lastAssistantText?: string;
 }
 
 export type ServerEvent =

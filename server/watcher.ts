@@ -344,6 +344,13 @@ export class SessionWatcher {
       tracker.agent.status = next.status;
       tracker.agent.currentTool = next.currentTool;
       tracker.agent.turnEnded = next.turnEnded;
+      // Capture assistant prose for the TTS pipeline — exposed to the
+      // frontend via the SSE agent_updated event, much cleaner than
+      // reading the PTY output stream (no cursor sequences, no thinking
+      // spinners, no prompt echo).
+      if (parsed.assistantText) {
+        tracker.agent.lastAssistantText = parsed.assistantText;
+      }
       // currentToolDetail follows the last tool_use of the same line.
       if (tu && next.currentTool === tu.name) {
         tracker.agent.currentToolDetail = toolDetail(tu.name, tu.input);

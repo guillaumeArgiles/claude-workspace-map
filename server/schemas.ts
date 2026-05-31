@@ -25,6 +25,8 @@ export const ToolUseBlockSchema = z.object({
 /** A `text` block in an assistant message. */
 export const TextBlockSchema = z.object({
   type: z.literal("text"),
+  /** Prose content of the block. Surfaced for TTS / dialogue rendering. */
+  text: z.string().optional(),
 });
 
 /** A `tool_result` block in a user message (the reply to a tool_use). */
