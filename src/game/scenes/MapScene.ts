@@ -238,7 +238,10 @@ export class MapScene extends Phaser.Scene {
     this.professorGlyph = this.add
       .text(0, 0, "💬", { fontSize: "20px" })
       .setOrigin(0.5, 0.5)
-      .setDepth(layerDepth.OVERLAYS + 5000)
+      // Above sprites / particles (OVERLAYS + 10..11) but well below the UI
+      // layer where modals live (UI = 9000). Previous value of +5000 floated
+      // it ABOVE modals, masking the routines panel & friends.
+      .setDepth(layerDepth.OVERLAYS + 100)
       .setVisible(false);
 
     this.agentSyncer.start();
@@ -280,9 +283,15 @@ export class MapScene extends Phaser.Scene {
       if (p) this.routinesPanel.checkProximity(p.x, p.y);
     }
 
-    // Show the 💬 invitation above Professor when no agent needs urgent attention.
+    // Show the 💬 invitation above Professor when no agent needs urgent
+    // attention AND no modal is open (otherwise the glyph would peek over
+    // the modal panel — and the player can't go talk to him anyway).
     if (this.professorGlyph && this.professorNpc) {
-      const calm = this.agentSyncer.allCalm();
+      const modalOpen =
+        this.agentMenu.isOpen() ||
+        this.approvalUI.isOpen() ||
+        this.routinesUI.isOpen();
+      const calm = this.agentSyncer.allCalm() && !modalOpen;
       this.professorGlyph.setVisible(calm);
       if (calm) {
         const sp = this.professorNpc.sprite;
