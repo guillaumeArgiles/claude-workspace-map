@@ -116,8 +116,16 @@ export class RPGApprovalUI {
   // ── Private ────────────────────────────────────────────────────────────────
 
   private async fetchPty(sessionId: string): Promise<void> {
+    // For sub-agent (student) NPCs, def.id is the tool_use_id (no PTY of its
+    // own). Reply has to go to the PARENT session's PTY — Claude Code routes
+    // it back to whichever sub-agent is waiting.
+    const npc = this.openFor;
+    const lookupId =
+      npc?.def.role === "student" && npc.def.parentId
+        ? npc.def.parentId
+        : sessionId;
     try {
-      const res = await fetch(`/api/sessions/by-session/${encodeURIComponent(sessionId)}`);
+      const res = await fetch(`/api/sessions/by-session/${encodeURIComponent(lookupId)}`);
       const { ptyId } = (await res.json()) as { ptyId: string | null };
       this.ptyId = ptyId;
     } catch {

@@ -203,6 +203,11 @@ export class AgentSyncer {
         existing.def.currentTool = sub.currentTool;
         existing.def.currentToolDetail = sub.currentToolDetail;
         existing.def.dialogue = statusDialogue(sub);
+        // Pending approval data flows from the watcher's subagent state — needed
+        // for the floating ? glyph, gold-star particles, and the [Space]
+        // approval routing in PlayerController.openInteractionFor.
+        existing.def.pendingPlan = sub.pendingPlan;
+        existing.def.pendingQuestions = sub.pendingQuestions;
         this.npcManager.refreshStatusBadge(existing);
         if (this.dialogue.openNpc === existing) this.dialogue.refresh(existing);
         if (
@@ -385,6 +390,10 @@ export class AgentSyncer {
       y: teacherNpc.home.y + offset.dy,
       sprite: STUDENT_SPRITES[spriteIdx],
       dialogue: statusDialogue(sub),
+      // Cover the cold-start case: if the watcher boots while a sub-agent is
+      // already in awaiting_approval, we still need the pendings on first paint.
+      pendingPlan: sub.pendingPlan,
+      pendingQuestions: sub.pendingQuestions,
     };
     return this.npcManager.spawn(def);
   }

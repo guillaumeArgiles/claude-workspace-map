@@ -2,7 +2,7 @@ import chokidar, { type FSWatcher } from "chokidar";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { parseLine, applyToAgentStatus, subAgentChanges, toolDetail, lastToolUse } from "./parser.js";
+import { parseLine, applyToAgentStatus, subAgentChanges, toolDetail, lastToolUse, statusFromTool } from "./parser.js";
 import { child } from "./logger.js";
 import type { AgentState, SubAgentState, PendingQuestion } from "../shared/agent-types.js";
 
@@ -301,16 +301,36 @@ export class SessionWatcher {
         if (idx !== undefined) {
           const sub = tracker.agent.subAgents[idx];
           sub.currentTool = ch.toolName;
-          sub.status = "running_tool";
+          // Status reflects the actual tool (ExitPlanMode / AskUserQuestion →
+          // awaiting_approval) instead of being hardcoded to running_tool.
+          sub.status = ch.toolName ? statusFromTool(ch.toolName) : "running_tool";
           if (tu && ch.toolName) {
             sub.currentToolDetail = toolDetail(ch.toolName, tu.input);
+          }
+          // Pending approval data when the subagent prompts the user. Mirrors
+          // the main-agent block below; cleared on any next tool (else branch).
+          if (ch.toolName === "ExitPlanMode" && tu) {
+            const inp = tu.input as Record<string, unknown> | undefined;
+            sub.pendingPlan = inp?.plan ? String(inp.plan) : undefined;
+            sub.pendingQuestions = undefined;
+          } else if (ch.toolName === "AskUserQuestion" && tu) {
+            const inp = tu.input as Record<string, unknown> | undefined;
+            sub.pendingQuestions = inp?.questions as PendingQuestion[] | undefined;
+            sub.pendingPlan = undefined;
+          } else {
+            // Subagent moved on to another tool → previous pending no longer applies.
+            sub.pendingPlan = undefined;
+            sub.pendingQuestions = undefined;
           }
         }
       } else if (ch.kind === "finish") {
         const idx = tracker.subByToolUseId.get(ch.toolUseId);
         if (idx !== undefined) {
-          tracker.agent.subAgents[idx].finished = true;
-          tracker.agent.subAgents[idx].status = "done";
+          const sub = tracker.agent.subAgents[idx];
+          sub.finished = true;
+          sub.status = "done";
+          sub.pendingPlan = undefined;
+          sub.pendingQuestions = undefined;
         }
       }
     }

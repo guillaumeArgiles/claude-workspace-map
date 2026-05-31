@@ -40,6 +40,10 @@ export interface SubAgentState {
   description?: string;
   /** True once the parent received the tool_result for this Task call. */
   finished: boolean;
+  /** Populated when the subagent is waiting on ExitPlanMode approval. */
+  pendingPlan?: string;
+  /** Populated when the subagent is waiting on AskUserQuestion. */
+  pendingQuestions?: PendingQuestion[];
 }
 
 export interface AgentState {
