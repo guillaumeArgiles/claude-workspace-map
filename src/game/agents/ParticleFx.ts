@@ -38,54 +38,72 @@ export class ParticleFx {
   }
 
   /**
-   * React to a status change for `npc`. Idempotent — calling twice with the
-   * same status is a no-op.
+   * Sync particle effects to `npc`'s current state.
    *
-   * Called from NpcManager.refreshStatusBadge after `npc.def.status` has
-   * been updated.
+   * Called from NpcManager.refreshStatusBadge — fires on every SSE update,
+   * not just on status transitions. The function is **declarative** : it
+   * computes what should be on/off for the current state and reconciles
+   * each emitter idempotently. Cheap (boolean checks), so it's fine to
+   * run on every call.
+   *
+   * Subtle case the declarative approach handles : when the user answers
+   * an approval, `pendingPlan`/`pendingQuestions` are cleared by the
+   * watcher but `status` stays at `awaiting_approval` until the agent's
+   * next tool_use (parser.ts:244). The star effect uses the pending
+   * flags as ground truth so it goes away the moment the user replies,
+   * not when the agent eventually picks up a tool.
    */
   applyForStatus(npc: NpcInstance, status: AgentStatus): void {
     const entry = this.emitters.get(npc) ?? {};
     const prev = entry.prevStatus;
-    if (prev === status) return;
 
-    // ─── coding → sparkles violets (continuous) ─────────────────────────────
-    if (status === "coding" && !entry.sparkle) {
+    // ── Desired state per continuous effect ────────────────────────────────
+    const wantSparkle = status === "coding";
+    const wantSmoke = status === "blocked";
+    // "Effectively awaiting" : status alone is unreliable post-answer (see
+    // jsdoc above). The pending flags ARE the user-facing signal — same
+    // semantic as the floating ? glyph + the RPGApprovalUI dismiss logic.
+    const wantStar =
+      status === "awaiting_approval" &&
+      (Boolean(npc.def.pendingPlan) ||
+        (npc.def.pendingQuestions?.length ?? 0) > 0);
+
+    // ── Reconcile each emitter (idempotent) ────────────────────────────────
+    if (wantSparkle && !entry.sparkle) {
       entry.sparkle = this.makeSparkleEmitter(npc);
-    } else if (status !== "coding" && entry.sparkle) {
+    } else if (!wantSparkle && entry.sparkle) {
       entry.sparkle.destroy();
       entry.sparkle = undefined;
     }
 
-    // ─── blocked → smoke gris (continuous) ──────────────────────────────────
-    if (status === "blocked" && !entry.smoke) {
+    if (wantSmoke && !entry.smoke) {
       entry.smoke = this.makeSmokeEmitter(npc);
-    } else if (status !== "blocked" && entry.smoke) {
+    } else if (!wantSmoke && entry.smoke) {
       entry.smoke.destroy();
       entry.smoke = undefined;
     }
 
-    // ─── awaiting_approval → étoiles dorées (continuous radial) ─────────────
-    if (status === "awaiting_approval" && !entry.star) {
+    if (wantStar && !entry.star) {
       entry.star = this.makeStarEmitter(npc);
-    } else if (status !== "awaiting_approval" && entry.star) {
+    } else if (!wantStar && entry.star) {
       entry.star.destroy();
       entry.star = undefined;
     }
 
-    // ─── task complete → one-shot confettis ─────────────────────────────────
-    // Le parser passe en `idle` quand un stop_hook fire (turn fini par l'agent).
-    // Status `done` n'arrive en pratique que sur SessionEnd ou via sous-agents,
-    // d'où l'option de tirer aussi sur transition active → idle.
-    const becameDone = status === "done" && prev !== undefined && prev !== "done";
-    const finishedTurn =
-      status === "idle" &&
-      (prev === "coding" ||
-        prev === "running_tool" ||
-        prev === "planning" ||
-        prev === "awaiting_approval");
-    if (becameDone || finishedTurn) {
-      this.fireConfetti(npc);
+    // ── One-shot confetti on real status transition ────────────────────────
+    // Parser passes status to `idle` on stop_hook (turn finished by agent).
+    // `done` only arrives on SessionEnd or via sub-agents — accept both.
+    if (prev !== status) {
+      const becameDone = status === "done" && prev !== undefined && prev !== "done";
+      const finishedTurn =
+        status === "idle" &&
+        (prev === "coding" ||
+          prev === "running_tool" ||
+          prev === "planning" ||
+          prev === "awaiting_approval");
+      if (becameDone || finishedTurn) {
+        this.fireConfetti(npc);
+      }
     }
 
     entry.prevStatus = status;
