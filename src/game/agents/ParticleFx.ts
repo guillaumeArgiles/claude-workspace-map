@@ -27,6 +27,7 @@ export class ParticleFx {
     {
       sparkle?: Phaser.GameObjects.Particles.ParticleEmitter;
       smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
+      star?: Phaser.GameObjects.Particles.ParticleEmitter;
       /** Last status applied — used to detect transitions (e.g. → done). */
       prevStatus?: AgentStatus;
     }
@@ -64,6 +65,14 @@ export class ParticleFx {
       entry.smoke = undefined;
     }
 
+    // ─── awaiting_approval → étoiles dorées (continuous radial) ─────────────
+    if (status === "awaiting_approval" && !entry.star) {
+      entry.star = this.makeStarEmitter(npc);
+    } else if (status !== "awaiting_approval" && entry.star) {
+      entry.star.destroy();
+      entry.star = undefined;
+    }
+
     // ─── task complete → one-shot confettis ─────────────────────────────────
     // Le parser passe en `idle` quand un stop_hook fire (turn fini par l'agent).
     // Status `done` n'arrive en pratique que sur SessionEnd ou via sous-agents,
@@ -92,6 +101,7 @@ export class ParticleFx {
     if (!entry) return;
     entry.sparkle?.destroy();
     entry.smoke?.destroy();
+    entry.star?.destroy();
     this.emitters.delete(npc);
   }
 
@@ -146,6 +156,32 @@ export class ParticleFx {
 
     // Cleanup une fois la dernière particule morte (+ marge).
     this.scene.time.delayedCall(1600, () => emitter.destroy());
+  }
+
+  private makeStarEmitter(
+    npc: NpcInstance
+  ): Phaser.GameObjects.Particles.ParticleEmitter {
+    const emitter = this.scene.add.particles(0, 0, ParticleFx.TEXTURE_KEY, {
+      // Emitted around the head, like sparkles but with a different vibe.
+      follow: npc.sprite,
+      followOffset: { x: 0, y: -npc.sprite.displayHeight * 0.4 },
+      // Gold/amber palette to match the floating ? glyph + yellow status badge.
+      tint: [0xfbbf24, 0xfde047, 0xfacc15],
+      lifespan: 900,
+      // Slower than sparkles — signal d'attention, pas une fête.
+      speed: { min: 25, max: 55 },
+      // Radial : full 360° fan, l'étoile rayonne dans toutes les directions.
+      angle: { min: 0, max: 360 },
+      // Grossit en s'éteignant : effet "expanding shimmer".
+      scale: { start: 0.3, end: 1.4 },
+      alpha: { start: 1, end: 0 },
+      frequency: 350,
+      quantity: 1,
+      // ADD blend pour le glow doré, cohérent avec les sparkles.
+      blendMode: Phaser.BlendModes.ADD,
+    });
+    emitter.setDepth(layerDepth.OVERLAYS + 10);
+    return emitter;
   }
 
   private makeSmokeEmitter(
