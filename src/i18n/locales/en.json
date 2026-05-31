@@ -195,6 +195,8 @@
   "routines.delete.warn": "Run history is wiped too. Irreversible.",
   "routines.footer.list_empty": "[N] New routine   [Esc] Close",
   "routines.footer.list_with_selection": "[↑↓] Navigate · [N] New · [E] Edit · [D] Delete · [Esc] Close",
-  "routines.footer.form": "[⏎] Submit · [Esc] Cancel   (Cmd+⏎ in the prompt)",
-  "routines.footer.delete": "[Y] Confirm · [Esc] Cancel"
+  "routines.footer.form": "Tip: [⏎] submits from short fields, [Cmd+⏎] in the prompt, [Esc] cancels",
+  "routines.footer.delete": "[Y] Confirm · [Esc] Cancel",
+  "routines.form.submit": "Save",
+  "routines.form.cancel": "Cancel"
 }

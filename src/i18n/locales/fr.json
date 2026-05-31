@@ -195,6 +195,8 @@
   "routines.delete.warn": "L'historique d'exécution est aussi effacé. Action irréversible.",
   "routines.footer.list_empty": "[N] Nouvelle routine   [Esc] Fermer",
   "routines.footer.list_with_selection": "[↑↓] Naviguer · [N] Nouvelle · [E] Éditer · [D] Supprimer · [Esc] Fermer",
-  "routines.footer.form": "[⏎] Valider · [Esc] Annuler   (Cmd+⏎ dans le prompt)",
-  "routines.footer.delete": "[Y] Confirmer · [Esc] Annuler"
+  "routines.footer.form": "Astuce : [⏎] valide depuis les champs courts, [Cmd+⏎] dans le prompt, [Esc] annule",
+  "routines.footer.delete": "[Y] Confirmer · [Esc] Annuler",
+  "routines.form.submit": "Valider",
+  "routines.form.cancel": "Annuler"
 }

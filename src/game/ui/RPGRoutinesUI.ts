@@ -313,7 +313,7 @@ export class RPGRoutinesUI {
     const panelW = Math.min(W - 60, 640);
     const panelH =
       this.view === "create" || this.view === "edit"
-        ? Math.min(H - 60, 540)
+        ? Math.min(H - 40, 500) // tall enough for all fields + buttons + footer
         : this.view === "delete-confirm"
           ? 200
           : Math.min(H - 80, 540);
@@ -674,8 +674,37 @@ export class RPGRoutinesUI {
     });
     y += 30;
 
-    // Submit/cancel hint already in the footer
-    void panelH;
+    // ── Action buttons : Annuler (gray) + Valider (gold, primary).
+    // Right-aligned at the bottom of the form area so they're discoverable
+    // for users who don't see the keyboard shortcuts in the footer.
+    const btnW = 130;
+    const btnH = 32;
+    const btnGap = 10;
+    const btnsY = panelH - 64;
+    const validerX = panelW - padX - btnW;
+    const annulerX = validerX - btnGap - btnW;
+    this.addButton(
+      panelX,
+      panelY,
+      annulerX,
+      btnsY,
+      btnW,
+      btnH,
+      t("routines.form.cancel"),
+      false,
+      () => this.onEscape()
+    );
+    this.addButton(
+      panelX,
+      panelY,
+      validerX,
+      btnsY,
+      btnW,
+      btnH,
+      t("routines.form.submit"),
+      true,
+      () => void this.commitForm()
+    );
   }
 
   /** Re-sync the visible cron input's value when the preset select changes. */
@@ -812,6 +841,69 @@ export class RPGRoutinesUI {
     dom.setScrollFactor(0);
     dom.setDepth(layerDepth.UI + 600);
     this.domNodes.push(dom);
+  }
+
+  /**
+   * Creates a styled HTML <button> overlay at (relX, relY) inside the modal.
+   * Primary buttons are gold (matches the modal border); secondary are
+   * neutral gray.
+   */
+  private addButton(
+    panelX: number,
+    panelY: number,
+    relX: number,
+    relY: number,
+    width: number,
+    height: number,
+    label: string,
+    primary: boolean,
+    onClick: () => void
+  ): void {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    Object.assign(btn.style, this.buttonStyle(width, height, primary));
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      onClick();
+    });
+    // Hover state — pure CSS would be nicer but we don't have a stylesheet
+    // injected for these dynamic buttons. JS suffices for now.
+    btn.addEventListener("mouseenter", () => {
+      btn.style.filter = "brightness(1.15)";
+    });
+    btn.addEventListener("mouseleave", () => {
+      btn.style.filter = "none";
+    });
+    const cx = panelX + relX + width / 2;
+    const cy = panelY + relY + height / 2;
+    const dom = this.scene.add.dom(cx, cy, btn);
+    dom.setScrollFactor(0);
+    dom.setDepth(layerDepth.UI + 600);
+    this.domNodes.push(dom);
+  }
+
+  private buttonStyle(
+    width: number,
+    height: number,
+    primary: boolean
+  ): Partial<CSSStyleDeclaration> {
+    return {
+      width: `${width}px`,
+      height: `${height}px`,
+      boxSizing: "border-box",
+      padding: "0 12px",
+      backgroundColor: primary ? "#fbbf24" : "#374151",
+      color: primary ? "#1a202c" : "#e5e7eb",
+      border: primary ? "1px solid #b45309" : "1px solid #4b5563",
+      borderRadius: "4px",
+      fontSize: "13px",
+      fontWeight: primary ? "bold" : "normal",
+      fontFamily: "ui-sans-serif, system-ui, sans-serif",
+      cursor: "pointer",
+      outline: "none",
+      transition: "filter 80ms",
+    };
   }
 
   private inputStyle(width: number, height: number): Partial<CSSStyleDeclaration> {
