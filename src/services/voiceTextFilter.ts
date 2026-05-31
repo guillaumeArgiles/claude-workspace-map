@@ -62,7 +62,23 @@ export class VoiceTextFilter {
     if (this.inCodeBlock) return null;
 
     // Pure box-drawing / separator lines (Claude Code's TUI uses ─│┌┐└┘├┤┬┴┼ widely).
-    if (/^[\s─│┌┐└┘├┤┬┴┼━┃┏┓┗┛┣┫┳┻╋═║╔╗╚╝╠╣╦╩╬·*=+\-_·]+$/u.test(line)) return null;
+    // Includes U+2580-U+259F block elements used in Claude Code's boot banner
+    // (▐▛███▜▌▝▜█████▛▘ etc.) — those are NOT in the box-drawing range.
+    if (
+      /^[\s─│┌┐└┘├┤┬┴┼━┃┏┓┗┛┣┫┳┻╋═║╔╗╚╝╠╣╦╩╬▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕▖▗▘▙▚▛▜▝▞▟·*=+\-_]+$/u.test(line)
+    )
+      return null;
+
+    // Claude Code's boot banner — the block-element art is followed by short
+    // meta lines we don't want to read. After stripping the leading chrome
+    // (handled by the edge-strip below), these match :
+    //   "Claude Code v2.1.158"
+    //   "Sonnet 4.6 · Claude Team"
+    //   "Opus 4.7 · Claude Max"
+    //   "~/.claude-workspace-map/professor"
+    if (/Claude Code v\d/i.test(line)) return null;
+    if (/^[\s▀-▟]*(?:Sonnet|Opus|Haiku)\s+\d/iu.test(line)) return null;
+    if (/Claude (?:Team|Free|Pro|Max|Plus)\b/i.test(line)) return null;
 
     // Standalone status markers / bullet characters that Claude Code emits
     // (✓, ✗, ●, ▸, ⏺, etc.) — strip them when they're the start of an
@@ -75,6 +91,9 @@ export class VoiceTextFilter {
     if (/^[~/][^\s]+\.[A-Za-z0-9]{1,8}$/u.test(line)) return null;
     // Same for relative paths with no spaces and an extension.
     if (/^\.{1,2}\/[^\s]+\.[A-Za-z0-9]{1,8}$/u.test(line)) return null;
+    // Directory paths without an extension (the boot banner shows the cwd
+    // as a bare ~ or / path).
+    if (/^[~/][\w./\-]+$/u.test(line)) return null;
 
     // Lines that are clearly URLs only (no surrounding prose).
     if (/^https?:\/\/\S+$/.test(line)) return null;
@@ -90,8 +109,21 @@ export class VoiceTextFilter {
     if (/^[⏺●▸]\s+[A-Za-z_][\w()]*/u.test(line)) return null;
 
     // Otherwise : speakable prose, but strip any leading / trailing box
-    // drawing chars that sit on the edges of a TUI panel row.
-    return line.replace(/^[\s─│┌┐└┘├┤┬┴┼━┃═║·*=]+|[\s─│┌┐└┘├┤┬┴┼━┃═║·*=]+$/gu, "") || null;
+    // drawing or block element chars that sit on the edges of a TUI panel
+    // row (the boot banner uses block elements ▐▛█▜▌ as decoration before
+    // labels we'd otherwise want to read).
+    const cleaned = line.replace(
+      /^[\s─│┌┐└┘├┤┬┴┼━┃═║▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕▖▗▘▙▚▛▜▝▞▟·*=]+|[\s─│┌┐└┘├┤┬┴┼━┃═║▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕▖▗▘▙▚▛▜▝▞▟·*=]+$/gu,
+      ""
+    );
+    if (!cleaned) return null;
+    // After stripping the chrome, re-check for the banner meta patterns —
+    // strings like "▐▛███▜▌   Claude Code v2.1.158" become "Claude Code v…"
+    // which we DO want to drop. Same for short version-only / dir lines.
+    if (/Claude Code v\d/i.test(cleaned)) return null;
+    if (/^(?:Sonnet|Opus|Haiku)\s+\d/i.test(cleaned)) return null;
+    if (/^[~/][\w./\-]+$/u.test(cleaned)) return null;
+    return cleaned;
   }
 
   /** Reset internal buffers — call when the PTY attach changes. */

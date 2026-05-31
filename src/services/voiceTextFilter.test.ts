@@ -77,6 +77,36 @@ describe("VoiceTextFilter", () => {
     expect(f.feed("Bonjour.\nComment vas-tu ?\n")).toBe("Bonjour. Comment vas-tu ?");
   });
 
+  it("drops Claude Code's boot banner (block-element art + meta lines)", () => {
+    const f = new VoiceTextFilter();
+    const banner =
+      "▐▛███▜▌   Claude Code v2.1.158\n" +
+      "▝▜█████▛▘  Sonnet 4.6 · Claude Team\n" +
+      "  ▘▘ ▝▝    ~/.claude-workspace-map/professor\n";
+    expect(f.feed(banner)).toBe("");
+  });
+
+  it("drops 'Sonnet 4.6 · Claude Team' style meta lines", () => {
+    const f = new VoiceTextFilter();
+    expect(f.feed("Sonnet 4.6 · Claude Team\n")).toBe("");
+    expect(f.feed("Opus 4.7 · Claude Max\n")).toBe("");
+    expect(f.feed("Haiku 4.5 · Claude Free\n")).toBe("");
+  });
+
+  it("drops bare home-dir paths from the banner", () => {
+    const f = new VoiceTextFilter();
+    expect(f.feed("~/.claude-workspace-map/professor\n")).toBe("");
+    expect(f.feed("/Users/foo/projects/bar\n")).toBe("");
+  });
+
+  it("keeps prose that mentions Claude inline", () => {
+    const f = new VoiceTextFilter();
+    // The "Claude Code v" rule should only fire when the line is meta —
+    // a prose sentence mentioning the name should still go through.
+    expect(f.feed("Bienvenue dans ton espace de travail Claude.\n"))
+      .toBe("Bienvenue dans ton espace de travail Claude.");
+  });
+
   it("reset() clears pending buffer and code-block state", () => {
     const f = new VoiceTextFilter();
     f.feed("```\nconst x = 1;\n");
