@@ -80,7 +80,7 @@
   "settings.voice": "Voz del Profesor",
   "settings.voice.on": "Activada",
   "settings.voice.off": "Desactivada",
-  "settings.voice.note": "Lee en voz alta las respuestas del Profesor (Web Speech API, voz del sistema)",
+  "settings.voice.note": "Lee en voz alta las respuestas del Profesor. Para una voz más natural, descarga las variantes « Enhanced » en Preferencias del Sistema → Accesibilidad → Contenido hablado → Voz del sistema.",
   "settings.cancel": "Cancelar",
   "settings.save": "Guardar",
   "settings.saving": "Guardando…",

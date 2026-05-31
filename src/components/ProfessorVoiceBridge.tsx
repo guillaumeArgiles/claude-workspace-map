@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { uiBus } from "../game/services/uiBus";
 import { voiceService } from "../services/voiceService";
+import { VoiceTextFilter } from "../services/voiceTextFilter";
 import type { Locale } from "../../shared/config-schema";
 
 /**
@@ -45,6 +46,12 @@ export function ProfessorVoiceBridge({
       eventSourceRef.current?.close();
       voiceService.cancel(); // drop in-flight speech from the previous spawn
 
+      // Filter strips ANSI + TUI chrome + code blocks + file paths from the
+      // PTY stream so only the Professor's actual prose reaches the TTS
+      // engine. Resets on every new attach so we don't carry over half-
+      // parsed code-block state.
+      const filter = new VoiceTextFilter();
+
       const es = new EventSource(
         `/api/sessions/${encodeURIComponent(ptyId)}/output`
       );
@@ -55,8 +62,8 @@ export function ProfessorVoiceBridge({
           const data = JSON.parse(ev.data) as { chunk?: string };
           const chunk = data.chunk ?? "";
           if (!chunk) return;
-          const clean = stripAnsi(chunk);
-          if (clean) voiceService.speak(clean);
+          const spoken = filter.feed(chunk);
+          if (spoken) voiceService.speak(spoken);
         } catch {
           /* malformed event — skip */
         }
@@ -84,32 +91,5 @@ export function ProfessorVoiceBridge({
   return null;
 }
 
-// ── ANSI stripping ───────────────────────────────────────────────────────────
-
-/**
- * Removes the ANSI escape sequences emitted by Claude Code's TUI (cursor
- * positioning, colours, bracketed paste mode, OSC titles, etc.) so the
- * resulting text reads naturally to a TTS engine.
- *
- * Patterns covered :
- * - CSI sequences  : `\x1b[…<letter>`
- * - OSC sequences  : `\x1b]…(BEL|ST)`
- * - Bracketed paste mode markers and other ESC-prefixed escapes
- * - Lone control characters (BEL, BS, CR alone, etc.)
- *
- * Implemented as a tight regex pipeline rather than depending on the
- * `strip-ansi` npm package — keeps the bundle slim and lets us tune the
- * filtering for our specific PTY output.
- */
-export function stripAnsi(input: string): string {
-  return input
-    // CSI : ESC [ params/intermediates letter
-    .replace(/\x1b\[[0-9;?<>= ]*[A-Za-z]/g, "")
-    // OSC : ESC ] ... BEL/ST
-    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
-    // Other ESC-prefixed two-char sequences (e.g. ESC > , ESC = , ESC (B)
-    .replace(/\x1b[()][A-Za-z0-9]/g, "")
-    .replace(/\x1b[>=]/g, "")
-    // Lone control chars (BEL, BS, FF, SO, SI, CR alone)
-    .replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]/g, "");
-}
+// stripAnsi + the line-level filter now live in src/services/voiceTextFilter.ts
+// so they can be unit-tested in isolation and reused outside this component.

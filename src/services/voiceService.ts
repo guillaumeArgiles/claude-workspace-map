@@ -126,15 +126,42 @@ class VoiceService {
       v.lang.toLowerCase().startsWith(langPrefix)
     );
     if (matches.length === 0) return null;
-    // Prefer a high-quality / local voice when available. macOS labels its
-    // best French voices "Thomas", "Marie", "Amélie" — match those first.
-    const PRIORITY = ["Thomas", "Amélie", "Marie", "Google", "Samantha"];
-    for (const name of PRIORITY) {
-      const v = matches.find((x) => x.name.includes(name));
-      if (v) return v;
-    }
-    return matches[0]!;
+    // Score each candidate. Higher = better.
+    return matches
+      .map((v) => ({ v, score: voiceQualityScore(v) }))
+      .sort((a, b) => b.score - a.score)[0]!.v;
   }
+}
+
+/**
+ * Heuristic ranking of a synthesis voice — higher means more natural.
+ *
+ * The Web Speech API doesn't expose audio quality directly, so we score on
+ * naming + flags :
+ * - macOS premium voices have "(Enhanced)" / "(Premium)" suffixes — these
+ *   sound dramatically better than the default robotic ones. Downloadable
+ *   for free in System Settings → Accessibility → Spoken Content.
+ * - "Neural" / "Online" hints at cloud-quality voices (Edge, Google).
+ * - Cloud voices (`localService=false`) are typically Google's neural ones
+ *   in Chrome — high quality when online.
+ * - Named curated voices (Thomas, Amélie, Marie on FR) as a fallback over
+ *   anonymous "Microsoft … (fr-FR)" defaults.
+ */
+function voiceQualityScore(v: SpeechSynthesisVoice): number {
+  let score = 0;
+  const n = v.name.toLowerCase();
+  if (n.includes("enhanced") || n.includes("premium")) score += 100;
+  if (n.includes("neural") || n.includes("online")) score += 80;
+  if (!v.localService) score += 30; // cloud voice (Google) — usually good
+  // Named macOS voices (FR : Thomas / Amélie / Marie ; EN : Samantha /
+  // Daniel / Karen) get a small bump over generic Microsoft / eSpeak ones.
+  for (const named of ["thomas", "amélie", "marie", "audrey", "samantha", "daniel", "karen"]) {
+    if (n.includes(named)) {
+      score += 20;
+      break;
+    }
+  }
+  return score;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

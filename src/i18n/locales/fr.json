@@ -80,7 +80,7 @@
   "settings.voice": "Voix du Professeur",
   "settings.voice.on": "Activée",
   "settings.voice.off": "Désactivée",
-  "settings.voice.note": "Lit à voix haute les réponses du Professeur (Web Speech API, voix système)",
+  "settings.voice.note": "Lit à voix haute les réponses du Professeur. Pour une voix plus naturelle, télécharge les voix « Enhanced » dans Préférences Système → Accessibilité → Contenu énoncé → Voix du système.",
   "settings.cancel": "Annuler",
   "settings.save": "Enregistrer",
   "settings.saving": "Enregistrement…",

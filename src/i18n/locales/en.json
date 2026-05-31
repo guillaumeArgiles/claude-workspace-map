@@ -80,7 +80,7 @@
   "settings.voice": "Professor's voice",
   "settings.voice.on": "On",
   "settings.voice.off": "Off",
-  "settings.voice.note": "Reads the Professor's responses aloud (Web Speech API, system voice)",
+  "settings.voice.note": "Reads the Professor's responses aloud. For a more natural voice, download the « Enhanced » variants in System Settings → Accessibility → Spoken Content → System Voice.",
   "settings.cancel": "Cancel",
   "settings.save": "Save",
   "settings.saving": "Saving…",
