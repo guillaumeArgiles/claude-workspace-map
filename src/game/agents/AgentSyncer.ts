@@ -7,6 +7,7 @@ import {
   STUDENT_SPRITES,
   hashString,
 } from "../../../shared/agent-sprites";
+import { characterNameFor } from "../../../shared/agent-character";
 import { AgentSource } from "../services/agentSource";
 import {
   HOUSES,
@@ -21,6 +22,32 @@ import type { NpcManager } from "./NpcManager";
 import type { DialogueUI } from "../ui/DialogueUI";
 
 export type StatusSeverity = "info" | "warn";
+
+/**
+ * Display label for a teacher NPC. Combines a stable character name (derived
+ * from sessionId) with the project name so the UI keeps both signals :
+ * "who is this agent" (character) and "where is it working" (project).
+ *
+ * Example : sessionId 1c4652e3… working in /Applications/MAMP/htdocs/map →
+ * "Aria · map". Same sessionId across reloads → same character name.
+ */
+function teacherLabel(sessionId: string, projectName: string): string {
+  return `${characterNameFor(sessionId)} · ${projectName}`;
+}
+
+/**
+ * Display label for a sub-agent (student) NPC. Combines a stable character
+ * name (derived from the tool_use_id) with the Task description if Claude
+ * provided one. Falls back to a generic "sub" suffix.
+ */
+function studentLabel(
+  subId: string,
+  description: string | undefined,
+  projectName: string
+): string {
+  const character = characterNameFor(subId);
+  return description ? `${character} · ${description}` : `${character} · ${projectName} · sub`;
+}
 
 export interface AgentSyncerCallbacks {
   /**
@@ -174,7 +201,7 @@ export class AgentSyncer {
     const prevTool = npc.def.currentTool;
     const prevDetail = npc.def.currentToolDetail;
     npc.def.status = agent.status;
-    npc.def.name = agent.projectName;
+    npc.def.name = teacherLabel(agent.sessionId, agent.projectName);
     npc.def.currentTool = agent.currentTool;
     npc.def.currentToolDetail = agent.currentToolDetail;
     npc.def.dialogue = statusDialogue(agent);
@@ -353,7 +380,7 @@ export class AgentSyncer {
     const spriteIdx = hashString(agent.sessionId) % TEACHER_SPRITES.length;
     return {
       id: agent.sessionId,
-      name: agent.projectName,
+      name: teacherLabel(agent.sessionId, agent.projectName),
       building: house.building,
       role: "teacher",
       status: agent.status,
@@ -379,7 +406,7 @@ export class AgentSyncer {
     const spriteIdx = hashString(sub.id) % STUDENT_SPRITES.length;
     const def: NpcDef = {
       id: sub.id,
-      name: sub.description ? sub.description : `${agent.projectName} · sub`,
+      name: studentLabel(sub.id, sub.description, agent.projectName),
       building: teacherNpc.def.building,
       role: "student",
       parentId: agent.sessionId,
