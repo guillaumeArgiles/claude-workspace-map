@@ -161,5 +161,25 @@
   "scene.connecting": "Connexion à /api/events…",
   "scene.professor.name": "Le Professeur",
   "scene.professor.dialogue": "Comment puis-je t'aider ?",
-  "scene.professor.interact": "parler au Professeur"
+  "scene.professor.interact": "parler au Professeur",
+
+  "routines.panel.title": "⏰ Routines",
+  "routines.panel.interact": "consulter les routines",
+  "routines.title": "⏰ Routines planifiées",
+  "routines.loading": "Chargement…",
+  "routines.error": "Erreur",
+  "routines.section.fleet": "Mes routines FleetView",
+  "routines.section.native": "Routines Claude natives",
+  "routines.empty.fleet": "Aucune routine pour l'instant. [N] pour en créer (phase 4 à venir).",
+  "routines.empty.native": "Aucune routine Claude natif détectée.",
+  "routines.source.claude-code-mcp": "Claude Code MCP",
+  "routines.source.claude-code-sessions": "Claude Code session",
+  "routines.source.claude-desktop": "Claude Desktop",
+  "routines.adhoc": "ad-hoc",
+  "routines.disabled": "désactivée",
+  "routines.next_run": "prochain {when}",
+  "routines.last_run": "dernier {when}",
+  "routines.more_hidden": "+ {count} autres routines non affichées",
+  "routines.footer.phase3": "[Esc] Fermer   (création/édition arrive en phase 4)",
+  "routines.footer.close": "[Esc] Fermer"
 }

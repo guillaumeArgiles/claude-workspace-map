@@ -28,6 +28,11 @@ export interface PlayerControllerDeps {
   findHouseForNpc: (npc: NpcInstance) => House | undefined;
   /** Called when the player presses Space on the Professor NPC. */
   onProfessorInteract?: () => void;
+  /** Called when the player presses Space near the routines panel (in the garden). */
+  onRoutinesPanelInteract?: () => void;
+  /** Routines panel world position — pass null when not yet built. The player
+   *  controller uses this each frame for proximity detection. */
+  routinesPanelPosition?: () => { x: number; y: number } | null;
 }
 
 /**
@@ -281,6 +286,14 @@ export class PlayerController {
 
     if (!Phaser.Input.Keyboard.JustDown(this.menuKey)) return;
 
+    // Routines panel takes priority over NPCs when in range — there's no
+    // visual overlap in practice (panel in garden, NPCs in houses) but
+    // we still resolve deterministically.
+    if (this.isPlayerNearRoutinesPanel()) {
+      this.deps.onRoutinesPanelInteract?.();
+      return;
+    }
+
     // Re-evaluate the nearest NPC each press so Space always targets the freshest one.
     let best: NpcInstance | undefined;
     let bestDist = INTERACTION_RADIUS;
@@ -297,6 +310,18 @@ export class PlayerController {
     if (!best) return;
 
     this.openInteractionFor(best);
+  }
+
+  /**
+   * True if the player is close enough to the routines panel to interact
+   * with it. Uses the same INTERACTION_RADIUS as NPC dialogue for
+   * consistency.
+   */
+  private isPlayerNearRoutinesPanel(): boolean {
+    const pos = this.deps.routinesPanelPosition?.();
+    if (!pos) return false;
+    const d = Math.hypot(pos.x - this.player.x, pos.y - this.player.y);
+    return d < INTERACTION_RADIUS;
   }
 
   /**

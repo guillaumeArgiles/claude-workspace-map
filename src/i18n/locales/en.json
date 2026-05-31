@@ -161,5 +161,25 @@
   "scene.connecting": "Connecting to /api/events…",
   "scene.professor.name": "The Professor",
   "scene.professor.dialogue": "How can I help you?",
-  "scene.professor.interact": "talk to the Professor"
+  "scene.professor.interact": "talk to the Professor",
+
+  "routines.panel.title": "⏰ Routines",
+  "routines.panel.interact": "view routines",
+  "routines.title": "⏰ Scheduled routines",
+  "routines.loading": "Loading…",
+  "routines.error": "Error",
+  "routines.section.fleet": "My FleetView routines",
+  "routines.section.native": "Claude-native routines",
+  "routines.empty.fleet": "No routines yet. Press [N] to create one (phase 4 coming).",
+  "routines.empty.native": "No Claude-native routines detected.",
+  "routines.source.claude-code-mcp": "Claude Code MCP",
+  "routines.source.claude-code-sessions": "Claude Code session",
+  "routines.source.claude-desktop": "Claude Desktop",
+  "routines.adhoc": "ad-hoc",
+  "routines.disabled": "disabled",
+  "routines.next_run": "next {when}",
+  "routines.last_run": "last {when}",
+  "routines.more_hidden": "+ {count} more routines hidden",
+  "routines.footer.phase3": "[Esc] Close   (create/edit coming in phase 4)",
+  "routines.footer.close": "[Esc] Close"
 }

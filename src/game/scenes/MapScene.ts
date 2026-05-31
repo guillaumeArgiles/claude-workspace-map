@@ -18,6 +18,8 @@ import {
 import { NavGrid } from "../world/NavGrid";
 import { RPGApprovalUI } from "../ui/RPGApprovalUI";
 import { RPGAgentMenuUI } from "../ui/RPGAgentMenuUI";
+import { RPGRoutinesUI } from "../ui/RPGRoutinesUI";
+import { RoutinesPanelObject } from "../world/RoutinesPanelObject";
 import { DragDropController } from "../services/DragDropController";
 import { t, subscribeLocale } from "../../i18n";
 
@@ -42,6 +44,8 @@ export class MapScene extends Phaser.Scene {
   private dragDrop = new DragDropController(this, this.npcManager);
   private dialogue = new DialogueUI(this);
   private approvalUI = new RPGApprovalUI(this);
+  private routinesUI = new RPGRoutinesUI(this);
+  private routinesPanel?: RoutinesPanelObject;
   // The player sprite is created lazily inside playerController.init(), so we
   // pass a getter instead of the sprite directly — this avoids a chicken/egg
   // between fields initialized at class-construction time. Explicit type
@@ -71,6 +75,8 @@ export class MapScene extends Phaser.Scene {
       findNpcById: (id) => this.agentSyncer.findNpcById(id),
       findHouseForNpc: (npc) => this.agentSyncer.findHouseForNpc(npc),
       onProfessorInteract: () => uiBus.emit("spawn_professor", {}),
+      onRoutinesPanelInteract: () => this.routinesUI.open(),
+      routinesPanelPosition: () => this.routinesPanel?.centerPosition() ?? null,
     }
   );
 
@@ -198,6 +204,18 @@ export class MapScene extends Phaser.Scene {
       showBadge: false,
     });
 
+    // Wooden notice board next to the Professor — entry point to the
+    // routines panel (RPGRoutinesUI). Positioned to his right; close
+    // enough that the player can read both at once but far enough that
+    // proximity detection doesn't conflict (INTERACTION_RADIUS ≈ 70).
+    this.routinesPanel = new RoutinesPanelObject(
+      this,
+      GRID.width / 2 + 140,
+      GRID.height - 250
+    );
+    this.routinesPanel.build();
+    this.routinesUI.init();
+
     // Locale change → refresh Professor's static labels (other NPCs refresh
     // automatically because their dialogue is recomputed via statusDialogue()
     // on every AgentSyncer tick).
@@ -254,6 +272,13 @@ export class MapScene extends Phaser.Scene {
     const frozen = this.agentMenu.openNpc ?? this.dialogue.openNpc;
     this.npcManager.updateAll(now, frozen);
     this.agentSyncer.tickDespawns(now);
+
+    // Routines UI key handling + prompt visibility around the wooden panel.
+    this.routinesUI.update();
+    if (this.routinesPanel) {
+      const p = this.playerController.sprite;
+      if (p) this.routinesPanel.checkProximity(p.x, p.y);
+    }
 
     // Show the 💬 invitation above Professor when no agent needs urgent attention.
     if (this.professorGlyph && this.professorNpc) {
