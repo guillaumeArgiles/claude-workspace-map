@@ -10,6 +10,18 @@ import { spawnProfessor, PROFESSOR_DIR } from "./professor.js";
 import { readConfig, writeConfig } from "./config-store.js";
 import { aggregateStats } from "./stats-aggregator.js";
 import { createMcpServer } from "./mcp/server.js";
+import {
+  createRoutine,
+  deleteRoutine,
+  getRoutine,
+  listRoutines,
+  updateRoutine,
+} from "./routines-store.js";
+import {
+  nextRunAtFor,
+  startRoutinesScheduler,
+  stopRoutinesScheduler,
+} from "./routines-scheduler.js";
 import type { ServerEvent, AgentState } from "../shared/agent-types.js";
 
 /** MIME types for static file serving (renderer assets in prod). */
@@ -340,6 +352,82 @@ export async function startServer(
       return;
     }
 
+    // ── FleetView routines — CRUD over ~/.claude-workspace-map/routines.json ──
+    // Read-only Claude-native routines are appended at GET /api/routines as
+    // a `native` array (added in phase 2).
+
+    if (req.method === "GET" && url === "/api/routines") {
+      try {
+        const fleet = await listRoutines();
+        const fleetWithNext = fleet.map((r) => ({ ...r, nextRunAt: nextRunAtFor(r) }));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ fleet: fleetWithNext, native: [] }));
+      } catch (err) {
+        log.warn({ err }, "GET /api/routines failed");
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+      return;
+    }
+
+    if (req.method === "POST" && url === "/api/routines") {
+      let body = "";
+      try {
+        for await (const chunk of req) body += chunk;
+        const input = body ? JSON.parse(body) : {};
+        const routine = await createRoutine(input);
+        res.writeHead(201, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ...routine, nextRunAt: nextRunAtFor(routine) }));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+      return;
+    }
+
+    const routineByIdMatch = url.match(/^\/api\/routines\/([^/?]+)$/);
+    if (req.method === "GET" && routineByIdMatch) {
+      const id = decodeURIComponent(routineByIdMatch[1]);
+      const routine = await getRoutine(id);
+      if (!routine) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ...routine, nextRunAt: nextRunAtFor(routine) }));
+      return;
+    }
+
+    if (req.method === "PUT" && routineByIdMatch) {
+      const id = decodeURIComponent(routineByIdMatch[1]);
+      let body = "";
+      try {
+        for await (const chunk of req) body += chunk;
+        const patch = body ? JSON.parse(body) : {};
+        const updated = await updateRoutine(id, patch);
+        if (!updated) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "not found" }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ...updated, nextRunAt: nextRunAtFor(updated) }));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+      return;
+    }
+
+    if (req.method === "DELETE" && routineByIdMatch) {
+      const id = decodeURIComponent(routineByIdMatch[1]);
+      const ok = await deleteRoutine(id);
+      res.writeHead(ok ? 200 : 404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok }));
+      return;
+    }
+
     // ── MCP server (streamable HTTP transport, stateless) ───────────────
     // Expose les tools FleetView au standard Model Context Protocol. Tout
     // client MCP (Claude Code, Claude Desktop, etc.) peut s'y brancher via
@@ -427,6 +515,7 @@ export async function startServer(
   readConfig().then((cfg) => writeConfig({ ...cfg, port })).catch(() => {});
 
   await watcher.start();
+  startRoutinesScheduler();
 
   log.info(
     {
@@ -446,6 +535,7 @@ export async function startServer(
       }
     }
     sseClients.clear();
+    stopRoutinesScheduler();
     await watcher.stop();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   };
