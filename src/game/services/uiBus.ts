@@ -13,6 +13,12 @@ export interface UiEvents {
   /** Player pressed E on the Professor NPC — sidebar should spawn the Professor session. */
   spawn_professor: Record<string, never>;
   /**
+   * Fired by the sidebar once Le Professeur's PTY has been spawned. Carries
+   * the ptyId so other listeners (e.g. ProfessorVoiceBridge) can hook into
+   * his output stream for TTS without re-running the spawn API.
+   */
+  professor_spawned: { ptyId: string; cwd: string };
+  /**
    * Fired by any Phaser-side modal (agent menu, approval panel) to tell the
    * sidebar to suspend its global keyboard shortcuts. `open=true` when the
    * modal opens, `open=false` when it closes. Multiple modals are coalesced

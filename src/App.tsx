@@ -6,6 +6,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { StatsDashboard } from "./components/StatsDashboard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { CmdKHint } from "./components/CmdKHint";
+import { ProfessorVoiceBridge } from "./components/ProfessorVoiceBridge";
 import { uiBus } from "./game/services/uiBus";
 import { I18nProvider, detectLocale, setLocale, useTranslation } from "./i18n";
 import type { AppConfig } from "../shared/config-schema";
@@ -163,6 +164,10 @@ function AppShell() {
         />
       )}
       {showStats && <StatsDashboard onClose={() => setShowStats(false)} />}
+      <ProfessorVoiceBridge
+        enabled={config?.voiceEnabled ?? false}
+        locale={config?.locale ?? "en"}
+      />
       <CmdKHint
         hidden={
           !sidebarCollapsed || showStats || showSettings || phaserModalDepth > 0

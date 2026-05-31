@@ -196,6 +196,10 @@ export function AgentSidebar({ collapsed, onToggle, onOpenSettings, onOpenStats 
       if (!res.ok) throw new Error(await res.text());
       const { ptyId, cwd } = (await res.json()) as { ptyId: string; cwd: string };
       handleSpawned({ ptyId, cwd, spawnedAt: Date.now() });
+      // Signal to ProfessorVoiceBridge (and any future Professor-aware
+      // listener) that a new Professor PTY is live. TTS subscribes to its
+      // output to speak each response aloud.
+      uiBus.emit("professor_spawned", { ptyId, cwd });
     } catch (err) {
       console.error("Failed to spawn Professor:", err);
     }

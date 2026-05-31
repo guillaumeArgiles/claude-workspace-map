@@ -103,6 +103,23 @@ export function SettingsPanel({ config, onClose, onChange }: SettingsPanelProps)
           <span className="settings-slider-val">{local.sidebarWidth}px</span>
         </div>
 
+        <span className="settings-label">{t("settings.voice")}</span>
+        <div className="settings-toggle">
+          <button
+            className={local.voiceEnabled ? "active" : ""}
+            onClick={() => setLocal((p) => ({ ...p, voiceEnabled: true }))}
+          >
+            {t("settings.voice.on")}
+          </button>
+          <button
+            className={!local.voiceEnabled ? "active" : ""}
+            onClick={() => setLocal((p) => ({ ...p, voiceEnabled: false }))}
+          >
+            {t("settings.voice.off")}
+          </button>
+        </div>
+        <span className="settings-note">{t("settings.voice.note")}</span>
+
         <span className="settings-label">{t("settings.server_port")}</span>
         <div>
           <span className="settings-port">{config.port}</span>
