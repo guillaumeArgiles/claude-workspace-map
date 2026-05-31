@@ -202,6 +202,7 @@ export class AgentSyncer {
     const prevDetail = npc.def.currentToolDetail;
     npc.def.status = agent.status;
     npc.def.name = teacherLabel(agent.sessionId, agent.projectName);
+    npc.def.characterName = characterNameFor(agent.sessionId);
     npc.def.currentTool = agent.currentTool;
     npc.def.currentToolDetail = agent.currentToolDetail;
     npc.def.dialogue = statusDialogue(agent);
@@ -381,6 +382,7 @@ export class AgentSyncer {
     return {
       id: agent.sessionId,
       name: teacherLabel(agent.sessionId, agent.projectName),
+      characterName: characterNameFor(agent.sessionId),
       building: house.building,
       role: "teacher",
       status: agent.status,
@@ -407,6 +409,7 @@ export class AgentSyncer {
     const def: NpcDef = {
       id: sub.id,
       name: studentLabel(sub.id, sub.description, agent.projectName),
+      characterName: characterNameFor(sub.id),
       building: teacherNpc.def.building,
       role: "student",
       parentId: agent.sessionId,

@@ -47,7 +47,10 @@ export class DialogueUI {
   setNearest(npc: NpcInstance | undefined): void {
     if (!this.promptText) return;
     if (npc && this.openFor !== npc) {
-      const label = npc.def.interactLabel ?? t("dialogue.interact.default", { name: npc.def.name });
+      // Prefer characterName (just "Liam") over name ("Liam · map") in the
+      // floating prompt — the project is already implicit from the map view.
+      const shortName = npc.def.characterName ?? npc.def.name;
+      const label = npc.def.interactLabel ?? t("dialogue.interact.default", { name: shortName });
       this.promptText.setText(t("dialogue.prompt", { label }));
       this.promptText.setPosition(npc.sprite.x, npc.sprite.y - PLAYER_H);
       this.promptText.setDepth(layerDepth.OVERLAYS + Math.round(npc.sprite.y));

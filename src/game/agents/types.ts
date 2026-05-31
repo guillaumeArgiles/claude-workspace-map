@@ -5,7 +5,13 @@ export type Direction = "down" | "left" | "right" | "up";
 
 export interface NpcDef {
   id: string;
+  /** Full display label, e.g. "Liam · map". Used in menu header. */
   name: string;
+  /** Just the character name, e.g. "Liam". Used in the floating "[Space]
+   *  parler à …" prompt where the project context is redundant (the agent
+   *  is visibly on the map, project is implicit). Falls back to `name` if
+   *  unset. Same for the Professor (no character name → uses name). */
+  characterName?: string;
   building?: string;
   /** Free-form role label (e.g. "teacher", "student"). */
   role?: string;
